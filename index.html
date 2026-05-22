@@ -234,6 +234,153 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .chlg-item { display:flex; gap:.7rem; font-size:.92rem; line-height:1.5; color:var(--text2); }
 .chlg-item::before { content:'›'; font-family:var(--fm); color:var(--accent); font-weight:bold; flex-shrink:0; }
 .chlg-row { display:flex; justify-content:flex-end; margin-top:.25rem; }
+
+/* ============ v34 ESSAY DETAIL SCREEN ============
+   A dedicated hub for a single essay. Sits between the home screen and the
+   activity screen in the navigation stack. The structure runs top-to-bottom:
+   hero (title + due-date countdown + summary), tier overview (four cards),
+   chunk list (vertical, each row expandable to show full text + activity
+   launcher + per-chunk stats), and a Recall/boss section. */
+#essay-detail { padding:1.5rem 2rem 5rem; flex-direction:column; gap:0; }
+/* v35 — The parent .screen rule sets justify-content:center and align-items:center,
+   which on tall content pushes the top above the viewport and makes it
+   unreachable even with overflow:auto. Override here so children stack from
+   the top and the scrollbar reaches the full content height. */
+#essay-detail.active { justify-content:flex-start; align-items:center; }
+/* Inner wrapper takes the max-width role so essay-detail itself can stay
+   full-width for the centering to work. */
+.ed-content-wrap { width:100%; max-width:1100px; display:flex; flex-direction:column; gap:1.8rem; }
+
+/* Hero zone — title + due countdown side-by-side, summary line below */
+.ed-hero { display:grid; grid-template-columns:1fr auto; gap:1.5rem; align-items:start; padding-bottom:1.25rem; border-bottom:1px solid var(--border); }
+.ed-hero-title { font-family:var(--fd); font-size:2.6rem; line-height:1.1; letter-spacing:.02em; }
+.ed-hero-tag { font-family:var(--fm); font-size:.66rem; letter-spacing:.14em; color:var(--text3); margin-top:.4rem; }
+.ed-hero-meta-actions { display:flex; gap:.4rem; margin-top:.7rem; }
+.ed-hero-due { font-family:var(--fd); font-size:1.4rem; padding:.9rem 1.3rem; border:2px solid currentColor; border-radius:var(--rl); text-align:center; min-width:170px; display:flex; flex-direction:column; gap:.25rem; }
+.ed-hero-due.overdue { color:var(--red); }
+.ed-hero-due.soon { color:var(--orange); }
+.ed-hero-due.ok { color:var(--text2); }
+.ed-hero-due.none { color:var(--text3); border-style:dashed; border-width:1.5px; }
+.ed-hero-due .ed-due-line2 { font-family:var(--fm); font-size:.62rem; letter-spacing:.1em; color:var(--text3); }
+.ed-hero-summary { grid-column:1/-1; font-family:var(--fm); font-size:.78rem; color:var(--text2); display:flex; gap:.8rem; align-items:center; flex-wrap:wrap; letter-spacing:.04em; }
+.ed-hero-summary .sep { color:var(--text3); opacity:.7; }
+.ed-add-due { color:var(--accent); cursor:pointer; text-decoration:underline dotted; font-family:var(--fm); }
+
+/* Four-tier overview strip */
+.ed-tiers { display:grid; grid-template-columns:repeat(4,1fr); gap:.85rem; }
+.ed-tier-card { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--rl); padding:1rem 1.15rem; cursor:pointer; transition:border-color .15s, transform .15s; display:flex; flex-direction:column; gap:.55rem; }
+.ed-tier-card:hover { transform:translateY(-2px); }
+.ed-tier-card.tf:hover { border-color:var(--fam); }
+.ed-tier-card.ts:hover { border-color:var(--sol); }
+.ed-tier-card.tm:hover { border-color:var(--mas); }
+.ed-tier-card.tr:hover { border-color:var(--orange); }
+.ed-tier-name { font-family:var(--fd); font-size:1.05rem; letter-spacing:.05em; }
+.ed-tier-card.tf .ed-tier-name { color:var(--fam); }
+.ed-tier-card.ts .ed-tier-name { color:var(--sol); }
+.ed-tier-card.tm .ed-tier-name { color:var(--mas); }
+.ed-tier-card.tr .ed-tier-name { background:linear-gradient(90deg,#ff5252,#ffa726,#ffd54f); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.ed-tier-frac { font-family:var(--fm); font-size:.72rem; color:var(--text2); }
+.ed-tier-bar { height:5px; background:var(--surface2); border-radius:3px; overflow:hidden; }
+.ed-tier-bar-fill { height:100%; transition:width .4s; border-radius:3px; }
+.ed-tier-card.tf .ed-tier-bar-fill { background:var(--fam); }
+.ed-tier-card.ts .ed-tier-bar-fill { background:var(--sol); }
+.ed-tier-card.tm .ed-tier-bar-fill { background:var(--mas); }
+.ed-tier-card.tr .ed-tier-bar-fill { background:linear-gradient(90deg,#ff5252,#ffa726,#ffd54f); }
+.ed-tier-foot { font-family:var(--fm); font-size:.6rem; color:var(--text3); letter-spacing:.04em; }
+.ed-tier-card.dim { opacity:.5; }
+
+/* Section headers between major zones */
+.ed-section-hdr { font-family:var(--fd); font-size:1rem; letter-spacing:.12em; color:var(--text2); margin-top:.3rem; padding-bottom:.4rem; border-bottom:1px solid var(--border); }
+
+/* Chunk list — vertical, each row expandable */
+.ed-chunks { display:flex; flex-direction:column; gap:.65rem; }
+.ed-chunk-row { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--rl); overflow:hidden; transition:border-color .15s, box-shadow .15s; }
+/* v36 — Hover states. Default rows light up purple to match the accent
+   colour used everywhere else for "you can interact with this"; mastered
+   rows brighten to full gold (rather than the dimmer 40%-opacity gold of
+   their resting state) so the gold-means-mastered signal stays consistent. */
+.ed-chunk-row:hover { border-color:var(--accent); }
+.ed-chunk-row.mastered { border-color:rgba(255,193,7,.4); }
+.ed-chunk-row.mastered:hover { border-color:var(--mas); }
+.ed-chunk-row.due { border-color:var(--orange); box-shadow:0 0 0 1px var(--orange) inset; }
+.ed-chunk-row.open { border-color:var(--accent); }
+.ed-chunk-hdr { display:grid; grid-template-columns:60px 1fr 130px; gap:1.25rem; padding:1rem 1.4rem; align-items:center; cursor:pointer; transition:background .15s; }
+.ed-chunk-hdr:hover { background:rgba(255,255,255,.02); }
+.ed-chunk-num { font-family:var(--fd); font-size:2rem; color:var(--text3); line-height:1; transition:color .2s; }
+.ed-chunk-row.mastered .ed-chunk-num { color:var(--mas); }
+.ed-chunk-row.due .ed-chunk-num { color:var(--orange); }
+.ed-chunk-prev { font-size:.92rem; line-height:1.55; color:var(--text); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.ed-chunk-pips { display:flex; flex-direction:column; gap:.3rem; }
+.ed-chunk-pip-row { display:flex; align-items:center; gap:.4rem; font-family:var(--fm); font-size:.55rem; letter-spacing:.1em; color:var(--text3); }
+.ed-chunk-pip-row .lbl { width:42px; text-align:right; }
+.ed-chunk-pip-row .pips { display:flex; gap:3px; }
+.ed-chunk-pip-row .pip { width:9px; height:9px; border-radius:2px; background:var(--surface2); border:1px solid var(--border); }
+.ed-chunk-pip-row .pip.f.done { background:var(--fam); border-color:var(--fam); }
+.ed-chunk-pip-row .pip.s.done { background:var(--sol); border-color:var(--sol); }
+.ed-chunk-pip-row .pip.m.done { background:var(--mas); border-color:var(--mas); }
+.ed-chunk-body { max-height:0; overflow:hidden; transition:max-height .35s ease; }
+.ed-chunk-row.open .ed-chunk-body { max-height:2400px; }
+.ed-chunk-body-inner { padding:1.2rem 1.4rem 1.4rem; display:flex; flex-direction:column; gap:1rem; border-top:1px solid var(--border); }
+.ed-chunk-text { background:var(--surface2); border:1px solid var(--border); border-radius:var(--r); padding:1rem 1.2rem; font-size:.95rem; line-height:1.75; max-height:300px; overflow-y:auto; white-space:pre-wrap; font-family:var(--fb); }
+
+/* Per-chunk stats panel */
+.ed-chunk-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:.5rem; }
+.ed-chunk-stat { background:var(--surface2); border:1px solid var(--border); border-radius:var(--r); padding:.55rem .85rem; display:flex; flex-direction:column; gap:.15rem; }
+.ed-chunk-stat .lbl { font-family:var(--fm); font-size:.55rem; letter-spacing:.1em; color:var(--text3); }
+.ed-chunk-stat .val { font-family:var(--fd); font-size:.9rem; color:var(--text); }
+
+/* Activity launcher inside expanded chunk */
+.ed-launcher-hdr { font-family:var(--fm); font-size:.62rem; letter-spacing:.12em; color:var(--text3); margin-top:.5rem; }
+.ed-act-tabs { display:flex; gap:.4rem; padding-bottom:.5rem; border-bottom:1px solid var(--border); }
+.ed-act-tab { font-family:var(--fm); font-size:.66rem; letter-spacing:.12em; padding:.45rem 1.1rem; background:none; border:1px solid var(--border); border-radius:999px; cursor:pointer; color:var(--text2); transition:all .15s; }
+.ed-act-tab.tf:hover:not(.locked) { color:var(--fam); border-color:var(--fam); }
+.ed-act-tab.ts:hover:not(.locked) { color:var(--sol); border-color:var(--sol); }
+.ed-act-tab.tm:hover:not(.locked) { color:var(--mas); border-color:var(--mas); }
+.ed-act-tab.tf.on { background:var(--fam); color:var(--bg); border-color:var(--fam); }
+.ed-act-tab.ts.on { background:var(--sol); color:var(--bg); border-color:var(--sol); }
+.ed-act-tab.tm.on { background:var(--mas); color:var(--bg); border-color:var(--mas); }
+.ed-act-tab.locked { opacity:.4; cursor:not-allowed; }
+.ed-act-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:.6rem; }
+.ed-act-card { background:var(--surface2); border:1px solid var(--border); border-radius:var(--r); padding:.85rem 1rem; cursor:pointer; transition:border-color .15s, transform .15s; display:flex; flex-direction:column; gap:.3rem; }
+.ed-act-card:hover { transform:translateY(-1px); border-color:var(--accent2); }
+.ed-act-card .ic { font-size:1.3rem; }
+.ed-act-card .nm { font-family:var(--fd); font-size:.82rem; letter-spacing:.02em; }
+.ed-act-card .de { font-size:.65rem; line-height:1.45; color:var(--text3); }
+.ed-act-card.done .nm::after { content:' ✓'; color:var(--mas); margin-left:.15rem; }
+.ed-act-card.locked { opacity:.45; cursor:not-allowed; }
+.ed-act-card.locked .nm::after { content:' 🔒'; }
+.ed-act-card.locked:hover { transform:none; border-color:var(--border); }
+.ed-act-locked-msg { font-family:var(--fm); font-size:.7rem; color:var(--text3); padding:.65rem 1rem; background:var(--surface2); border-left:3px solid var(--text3); border-radius:4px; line-height:1.5; }
+
+/* Recall / boss section at bottom */
+.ed-recall { background:var(--surface2); border:2px solid transparent; border-radius:var(--rl); padding:2rem 2rem 2.2rem; text-align:center; display:flex; flex-direction:column; gap:.85rem; align-items:center; position:relative; }
+.ed-recall.locked { border:1.5px dashed var(--border2); }
+.ed-recall.locked .ed-recall-skull { opacity:.25; }
+.ed-recall.ready { background:linear-gradient(var(--surface2),var(--surface2)) padding-box, linear-gradient(90deg,#ff5252,#ffa726,#ffd54f) border-box; }
+.ed-recall.beaten { background:linear-gradient(var(--surface2),var(--surface2)) padding-box, linear-gradient(90deg,#ffd54f,#ff9800) border-box; }
+.ed-recall-skull { font-size:3rem; line-height:1; }
+.ed-recall.ready .ed-recall-skull { animation:ed-recall-pulse 1.8s ease-in-out infinite; }
+@keyframes ed-recall-pulse { 0%,100% { transform:scale(1); filter:drop-shadow(0 0 8px rgba(255,87,34,.5)); } 50% { transform:scale(1.1); filter:drop-shadow(0 0 18px rgba(255,200,0,.85)); } }
+.ed-recall-title { font-family:var(--fd); font-size:1.4rem; letter-spacing:.05em; }
+.ed-recall.ready .ed-recall-title { background:linear-gradient(90deg,#ff5252,#ffa726,#ffd54f); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.ed-recall.locked .ed-recall-title { color:var(--text3); }
+.ed-recall.beaten .ed-recall-title { color:var(--mas); }
+.ed-recall-sub { font-family:var(--fm); font-size:.72rem; color:var(--text3); letter-spacing:.04em; }
+.ed-recall-bar { width:60%; max-width:320px; height:6px; background:var(--surface); border-radius:3px; overflow:hidden; }
+.ed-recall-bar-fill { height:100%; background:linear-gradient(90deg,#ff5252,#ffa726,#ffd54f); transition:width .4s; }
+.ed-recall-btn { font-family:var(--fd); font-size:1rem; padding:.9rem 2.5rem; background:linear-gradient(135deg,var(--mas),var(--orange)); color:var(--bg); border:none; border-radius:var(--r); cursor:pointer; letter-spacing:.08em; transition:transform .15s, filter .15s; margin-top:.4rem; }
+.ed-recall-btn:hover { transform:scale(1.04); filter:brightness(1.15); }
+.ed-recall-btn.replay { background:var(--surface); color:var(--text2); border:1px solid var(--border); }
+.ed-recall-victory-meta { font-family:var(--fm); font-size:.7rem; color:var(--text2); display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; }
+
+/* Responsive — stack tier strip on narrow viewports */
+@media (max-width:780px) {
+  .ed-tiers { grid-template-columns:repeat(2,1fr); }
+  .ed-hero { grid-template-columns:1fr; }
+  .ed-hero-due { min-width:0; }
+  .ed-chunk-hdr { grid-template-columns:50px 1fr; }
+  .ed-chunk-pips { grid-column:1/-1; flex-direction:row; flex-wrap:wrap; }
+}
 .em-title { font-family:var(--fd); font-size:1.6rem; letter-spacing:.05em; }
 .em-input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:var(--r); color:var(--text); font-family:var(--fb); font-size:.88rem; padding:.75rem 1rem; outline:none; transition:border-color .15s; }
 .em-input:focus { border-color:var(--accent); }
@@ -869,7 +1016,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div class="sep"></div>
   <div class="si">🏆 <span class="v" id="sbm">0</span>/<span class="v" id="sbt">0</span> mastered</div>
   <div style="flex:1"></div>
-  <button class="bs sm" id="btn-essays">📚 Essays</button>
 </div>
 
 <!-- LAUNCH -->
@@ -1058,6 +1204,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div class="cgrid" id="cgrid"></div>
 </div>
 
+<!-- v34 ESSAY DETAIL — populated dynamically by renderEssayDetail() -->
+<div class="screen" id="essay-detail"></div>
+
 <!-- ACTIVITY -->
 <div class="screen" id="sact">
   <div style="display:flex;align-items:center;gap:.75rem;width:100%;margin-bottom:1rem;">
@@ -1113,8 +1262,26 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 // they differ. To ship a new version: increment CURRENT_VERSION, add an entry
 // to CHANGELOG at the top of the list. Brand-new users (no app data at all)
 // skip the popup — they get a fresh start, not an update notification.
-const CURRENT_VERSION='33';
+const CURRENT_VERSION='36';
 const CHANGELOG={
+  '36':{date:'May 2026',items:[
+    'Removed the redundant "Essays" button from the stats bar — the new essay detail screen replaces what it used to do, and the bar was blocking buttons on other screens.',
+    'The stats bar now shows only during practice activities and the Recall boss battle; it no longer leaks onto the home, essay detail, or welcome screens.',
+    'Finishing an activity now returns you to the essay detail page when you launched it from there, including the post-completion "← Activities" button — not just the top back button.',
+    'Hovering a chunk row in the essay detail page now shows a purple border, or a gold border when the chunk is mastered.',
+    'Per-chunk stats no longer list Recite-tier scores; only Retain and Remember activity bests are shown, since those are the meaningful recall measurements.'
+  ]},
+  '35':{date:'May 2026',items:[
+    'Fixed the essay detail page so you can scroll all the way to the top and bottom — previously the page was vertically centered, which clipped the back button and the bottom of the chunk list out of reach.',
+    'The activity-screen back button now returns you to the essay detail page when you launched the activity from there, rather than dropping you on the Essays tab.',
+    'Removed the "X / N chunks mastered · Working through… · Recall locked" summary line from the hero so only the essay title shows at the top of each detail page.'
+  ]},
+  '34':{date:'May 2026',items:[
+    'Each essay now has its own dedicated detail page — a single hub showing the due-date countdown, four-tier overview, expandable chunk list, and Recall section.',
+    'Chunks are now a vertical list rather than a grid, and each row expands inline to reveal the full chunk text, your personal bests, review schedule, and an activity launcher.',
+    'You can start any unlocked activity directly from the chunk row — no more navigating through the chunks screen first.',
+    'The Recall section at the bottom of each essay page now clearly shows whether the boss is locked, ready, or already beaten, with a replay option after the first win.'
+  ]},
   '33':{date:'May 2026',items:[
     'New: this changelog popup — shows once after each update and tracks per-version so you only see it for new releases.'
   ]},
@@ -1201,7 +1368,33 @@ function masOk(i){return solOk(i)&&G.prog[i].s.size>=2;}
 function isMastered(i){return masOk(i)&&G.prog[i].m.size>=1;}
 
 // ========== SCREEN ==========
-function SS(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.getElementById('ro').classList.remove('on');}
+// v36 — SS now also manages the stats bar (#sb) visibility deterministically.
+// The bar shows only on activity-related screens (sact, spr, boss-screen)
+// and is hidden on home, essay-detail, sl, and si-screen. Previously the bar
+// was toggled ad-hoc by individual handlers, which caused it to leak onto
+// other screens and intercept clicks on buttons sitting behind it.
+function SS(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('ro').classList.remove('on');
+  const sb=document.getElementById('sb');
+  if(id==='sact'||id==='spr'||id==='boss-screen'){sb.classList.add('on');sb.classList.remove('hide');}
+  else{sb.classList.add('hide');sb.classList.remove('on');}
+}
+// v36 — Shared back-to-parent navigation for the activity flow. When the user
+// reached the practice/activity screen via the new essay detail page, return
+// them there. Otherwise fall back to the original "back to activity picker"
+// behaviour. Used by btn-bta (static practice-screen back button) and by every
+// dynamic post-completion "← Activities" button.
+function edBackToParent(){
+  clearTmr();stopMic();
+  if(G.edReturnEi!=null&&G.essays[G.edReturnEi]){
+    const ei=G.edReturnEi;G.edReturnEi=null;
+    openEssayDetail(ei);
+  } else {
+    renderCPStrip(G.cur);upTierLocks(G.cur);switchTier(G.tier);SS('sact');
+  }
+}
 
 // ========== LAUNCH ==========
 document.getElementById('btn-la').addEventListener('click',()=>{
@@ -1366,7 +1559,6 @@ function loadEssay(i){
   upStats();savePersist();
   toast('📖',`Loaded: ${e.title}`);
 }
-document.getElementById('btn-essays').addEventListener('click',openEssayModal);
 document.getElementById('em-cancel').addEventListener('click',()=>document.getElementById('edit-modal').classList.remove('on'));
 
 // ========== INPUT ==========
@@ -1433,7 +1625,20 @@ function openChunk(i){
   document.getElementById('sb').classList.remove('hide');
   SS('sact');
 }
-document.getElementById('btn-btc').addEventListener('click',()=>{stopMic();goHome();switchHomeTab('essays');});
+// v35 — Activity back button. If the activity was launched from the essay
+// detail screen (G.edReturnEi was set by edLaunchActivity), navigate back to
+// that essay's detail page. Otherwise fall back to the original behaviour of
+// going home and showing the Essays tab. The flag is cleared after use so the
+// next session starts clean.
+document.getElementById('btn-btc').addEventListener('click',()=>{
+  stopMic();
+  if(G.edReturnEi!=null&&G.essays[G.edReturnEi]){
+    const ei=G.edReturnEi;G.edReturnEi=null;
+    openEssayDetail(ei);
+  } else {
+    goHome();switchHomeTab('essays');
+  }
+});
 document.getElementById('btn-switch-essay').addEventListener('click',openEssayModal);
 document.getElementById('btn-edit-essay').addEventListener('click',()=>{
   const e=G.essays[G.essayIdx];
@@ -1542,10 +1747,7 @@ function switchTier(t){
   });
   tc.appendChild(ag);
 }
-document.getElementById('btn-bta').addEventListener('click',()=>{
-  clearTmr();stopMic();
-  renderCPStrip(G.cur);upTierLocks(G.cur);switchTier(G.tier);SS('sact');
-});
+document.getElementById('btn-bta').addEventListener('click',edBackToParent);
 
 // ========== TIMER SCALING ==========
 function roundTo30(sec){return Math.round(sec/30)*30||30;}
@@ -2006,7 +2208,7 @@ function doScramble(ch){
       const retryBtn=document.createElement('button');retryBtn.className='bp sm';retryBtn.textContent='↺ TRY AGAIN';
       retryBtn.addEventListener('click',()=>startAct(G.tier,G.act));
       const backBtn=document.createElement('button');backBtn.className='bs';backBtn.textContent='← Activities';
-      backBtn.addEventListener('click',()=>{renderCPStrip(G.cur);upTierLocks(G.cur);switchTier(G.tier);SS('sact');});
+      backBtn.addEventListener('click',edBackToParent);
       pa.appendChild(retryBtn);pa.appendChild(backBtn);
       clearTmr();
     }
@@ -2020,7 +2222,7 @@ function doScramble(ch){
     const retryBtn=document.createElement('button');retryBtn.className='bp sm';retryBtn.textContent='↺ TRY AGAIN';
     retryBtn.addEventListener('click',()=>startAct(G.tier,G.act));
     const backBtn=document.createElement('button');backBtn.className='bs';backBtn.textContent='← Activities';
-    backBtn.addEventListener('click',()=>{renderCPStrip(G.cur);upTierLocks(G.cur);switchTier(G.tier);SS('sact');});
+    backBtn.addEventListener('click',edBackToParent);
     pa.appendChild(retryBtn);pa.appendChild(backBtn);
     clearTmr();
   }));
@@ -2086,7 +2288,7 @@ function doFreeRecall(ch){
     const retryBtn=document.createElement('button');retryBtn.className='bp sm';retryBtn.textContent='↺ TRY AGAIN';
     retryBtn.addEventListener('click',()=>startAct(G.tier,G.act));
     const backBtn=document.createElement('button');backBtn.className='bs';backBtn.textContent='← Activities';
-    backBtn.addEventListener('click',()=>{renderCPStrip(G.cur);upTierLocks(G.cur);switchTier(G.tier);SS('sact');});
+    backBtn.addEventListener('click',edBackToParent);
     pa.appendChild(retryBtn);pa.appendChild(backBtn);
     clearTmr();ghostReset();
   }));
@@ -2361,7 +2563,7 @@ function startTmr(sec){
       retryBtn.addEventListener('click',()=>startAct(G.tier,G.act));
       const backBtn=document.createElement('button');
       backBtn.className='bs';backBtn.textContent='← Activities';
-      backBtn.addEventListener('click',()=>{renderCPStrip(G.cur);upTierLocks(G.cur);switchTier(G.tier);SS('sact');});
+      backBtn.addEventListener('click',edBackToParent);
       pa.appendChild(retryBtn);pa.appendChild(backBtn);
       setP(0,'Failed — timer expired');
     }
@@ -3783,6 +3985,262 @@ function renderHomeTab(){
   });
 }
 
+// ============ v34 ESSAY DETAIL SCREEN ============
+// Tracks which essay's detail page is currently being viewed. Used by
+// renderEssayDetail() to know what to rebuild after data changes.
+let edCurrentEi=-1;
+
+// openEssayDetail — the public entry point. Other code calls this to navigate
+// into a particular essay's hub. We store the index, build the markup, then
+// switch the visible screen.
+function openEssayDetail(ei){
+  if(ei<0||ei>=G.essays.length)return;
+  edCurrentEi=ei;
+  renderEssayDetail(ei);
+  SS('essay-detail');
+}
+
+// renderEssayDetail — builds the entire screen markup from scratch. Called on
+// open and any time state-changing actions need to refresh the view. Cheap
+// enough to do every visit; the chunks list is the only part that gets large
+// and we lazy-build each expanded chunk anyway.
+function renderEssayDetail(ei){
+  const e=G.essays[ei];if(!e)return;
+  const total=e.chunks.length;
+  // Count chunks at each tier-completion threshold: f needs ≥3 to advance,
+  // s needs ≥2, m needs ≥1 (which equals fully mastered).
+  const tF=e.chunks.reduce((s,_,ci)=>s+((e.prog?.[ci]?.f?.size||0)>=3?1:0),0);
+  const tS=e.chunks.reduce((s,_,ci)=>s+((e.prog?.[ci]?.s?.size||0)>=2?1:0),0);
+  const tM=e.chunks.filter((_,ci)=>e.prog?.[ci]?.mastered).length;
+  const allMastered=tM===total&&total>0;
+  const recallState=e.bossBeaten?'beaten':allMastered?'ready':'locked';
+
+  // ----- Hero header -----
+  // v35 — The summary line ("3 / 7 mastered · Working through Remember · Recall locked")
+  // that originally sat below the title was removed at the user's request. The hero
+  // now contains just the essay title with its tag line, the edit/delete buttons,
+  // and the due-date pill on the right. State context is still conveyed through
+  // the tier strip immediately below the hero, so no information is lost.
+  let h=`<button class="bk" id="ed-back">← Essays</button>`;
+  h+=`<div class="ed-hero">`;
+  h+=`<div><div class="ed-hero-title">${esc(e.title)}</div><div class="ed-hero-tag">ESSAY · ${total} CHUNK${total!==1?'S':''}</div>`;
+  h+=`<div class="ed-hero-meta-actions"><button class="bs sm" id="ed-edit">✏️ Edit</button><button class="bs sm" id="ed-delete">🗑️ Delete</button></div></div>`;
+
+  // Due-date display — uses dueState() for the colour class. When no date is
+  // set we show a dashed "No deadline" with an "Add due date" link that opens
+  // the existing edit modal.
+  if(e.dueDate){
+    const ds=dueState(e.dueDate);
+    const dr=daysDiff(localDateKey(),e.dueDate);
+    let line;
+    if(dr<0)line=`Overdue by ${Math.abs(dr)} day${Math.abs(dr)!==1?'s':''}`;
+    else if(dr===0)line='Due today';
+    else if(dr===1)line='Due tomorrow';
+    else line=`In ${dr} days`;
+    h+=`<div class="ed-hero-due ${ds}"><div>${line}</div><div class="ed-due-line2">${fmtDueDate(e.dueDate)}</div></div>`;
+  } else {
+    h+=`<div class="ed-hero-due none"><div>No deadline</div><div class="ed-due-line2"><span class="ed-add-due" id="ed-add-due">+ Add due date</span></div></div>`;
+  }
+  h+=`</div>`;
+
+  // ----- Tier overview strip -----
+  // The four cards mirror the four tiers. Clicking one scrolls down to the
+  // matching content section. The Recall card has three visual states.
+  h+=`<div class="ed-tiers">`;
+  const tierData=[['tf','Recite',tF,total,'f','chunks'],['ts','Retain',tS,total,'s','chunks'],['tm','Remember',tM,total,'m','chunks']];
+  tierData.forEach(([cls,nm,count,tot,tk,target])=>{
+    const pct=tot?count/tot*100:0;
+    h+=`<div class="ed-tier-card ${cls}" data-scroll="${target}"><div class="ed-tier-name">${nm}</div><div class="ed-tier-frac">${count} / ${tot} chunks</div><div class="ed-tier-bar"><div class="ed-tier-bar-fill" style="width:${pct}%"></div></div><div class="ed-tier-foot">${TIER_XP[tk][0]}–${TIER_XP[tk][1]} XP per activity</div></div>`;
+  });
+  let recallFoot,recallCls='';
+  if(recallState==='locked'){recallFoot='Master all chunks first';recallCls='dim';}
+  else if(recallState==='ready')recallFoot='Ready — challenge yourself';
+  else recallFoot='💀 Beaten';
+  h+=`<div class="ed-tier-card tr ${recallCls}" data-scroll="recall"><div class="ed-tier-name">Recall</div><div class="ed-tier-frac">Full essay challenge</div><div class="ed-tier-bar"><div class="ed-tier-bar-fill" style="width:${total?tM/total*100:0}%"></div></div><div class="ed-tier-foot">${recallFoot}</div></div></div>`;
+
+  // ----- Chunk list -----
+  h+=`<div class="ed-section-hdr" id="ed-chunks-section">CHUNKS</div><div class="ed-chunks" id="ed-chunks-list"></div>`;
+
+  // ----- Recall / boss section -----
+  h+=`<div class="ed-section-hdr" id="ed-recall-section">RECALL</div>`;
+  h+=`<div class="ed-recall ${recallState}"><div class="ed-recall-skull">💀</div>`;
+  if(recallState==='locked'){
+    const left=total-tM;
+    h+=`<div class="ed-recall-title">Recall is locked</div><div class="ed-recall-sub">Master ${left} more chunk${left!==1?'s':''} to unlock</div>`;
+    h+=`<div class="ed-recall-bar"><div class="ed-recall-bar-fill" style="width:${total?tM/total*100:0}%"></div></div>`;
+  } else if(recallState==='ready'){
+    h+=`<div class="ed-recall-title">The full essay awaits</div><div class="ed-recall-sub">All ${total} chunks mastered. Run the gauntlet.</div>`;
+    h+=`<button class="ed-recall-btn" id="ed-recall-btn">RECALL →</button>`;
+  } else {
+    const when=e.bossBeatenAt?new Date(e.bossBeatenAt).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'recently';
+    h+=`<div class="ed-recall-title">Recall beaten</div><div class="ed-recall-victory-meta"><span>First beaten: ${when}</span></div>`;
+    h+=`<button class="ed-recall-btn replay" id="ed-recall-btn">REPLAY →</button>`;
+  }
+  h+=`</div>`;
+
+  // Inject and wire up interactive elements. The ed-content-wrap provides
+  // the max-width constraint and column gap; the screen itself stays full-width
+  // so the parent flex can centre the wrap horizontally.
+  const root=document.getElementById('essay-detail');
+  root.innerHTML=`<div class="ed-content-wrap">${h}</div>`;
+
+  document.getElementById('ed-back').onclick=()=>{switchHomeTab('essays');SS('home');};
+  document.getElementById('ed-edit').onclick=()=>openEditFor(ei);
+  document.getElementById('ed-delete').onclick=()=>{
+    if(confirm(`Delete "${e.title}"? This cannot be undone.`)){
+      G.essays.splice(ei,1);
+      if(G.essayIdx>=G.essays.length)G.essayIdx=Math.max(0,G.essays.length-1);
+      savePersist();switchHomeTab('essays');SS('home');renderEssaysTab();
+    }
+  };
+  const addDue=document.getElementById('ed-add-due');if(addDue)addDue.onclick=()=>openEditFor(ei);
+
+  // Tier-strip click scrolls down to either the chunk list or the Recall section
+  root.querySelectorAll('.ed-tier-card').forEach(c=>{
+    c.onclick=()=>{
+      const t=c.dataset.scroll==='recall'?'ed-recall-section':'ed-chunks-section';
+      document.getElementById(t)?.scrollIntoView({behavior:'smooth',block:'start'});
+    };
+  });
+
+  const rbtn=document.getElementById('ed-recall-btn');
+  if(rbtn)rbtn.onclick=()=>{loadEssayInto(ei);window.startBossReplay&&window.startBossReplay();};
+
+  // Build the chunk rows
+  const cl=document.getElementById('ed-chunks-list');
+  e.chunks.forEach((ch,ci)=>cl.appendChild(edBuildChunkRow(e,ei,ci,ch)));
+}
+
+// edBuildChunkRow — collapsed-state markup for one chunk. The expanded body is
+// built lazily on first open so we don't pay the cost for chunks the user
+// never opens.
+function edBuildChunkRow(e,ei,ci,ch){
+  const p=e.prog?.[ci]||{f:new Set(),s:new Set(),m:new Set()};
+  const fSz=p.f?.size||0,sSz=p.s?.size||0,mSz=p.m?.size||0;
+  const due=isDue(p,e.dueDate);
+  const row=document.createElement('div');
+  row.className='ed-chunk-row'+(p.mastered?' mastered':'')+(due?' due':'');
+  row.innerHTML=`<div class="ed-chunk-hdr">
+    <div class="ed-chunk-num">${ci+1}</div>
+    <div class="ed-chunk-prev">${esc(ch.trim())}</div>
+    <div class="ed-chunk-pips">
+      <div class="ed-chunk-pip-row"><span class="lbl">RECITE</span><div class="pips">${ACTS.f.map((_,j)=>`<div class="pip f${j<fSz?' done':''}"></div>`).join('')}</div></div>
+      <div class="ed-chunk-pip-row"><span class="lbl">RETAIN</span><div class="pips">${ACTS.s.map((_,j)=>`<div class="pip s${j<sSz?' done':''}"></div>`).join('')}</div></div>
+      <div class="ed-chunk-pip-row"><span class="lbl">REMEMB</span><div class="pips">${ACTS.m.map((_,j)=>`<div class="pip m${j<mSz?' done':''}"></div>`).join('')}</div></div>
+    </div>
+  </div><div class="ed-chunk-body"><div class="ed-chunk-body-inner"></div></div>`;
+  const hdr=row.querySelector('.ed-chunk-hdr');
+  const inner=row.querySelector('.ed-chunk-body-inner');
+  hdr.onclick=()=>{
+    if(row.classList.contains('open')){row.classList.remove('open');return;}
+    // Single-open accordion — close any other open row
+    document.querySelectorAll('.ed-chunk-row.open').forEach(r=>r.classList.remove('open'));
+    row.classList.add('open');
+    if(!inner.dataset.built){inner.dataset.built='1';edBuildChunkExpanded(e,ei,ci,ch,inner);}
+  };
+  return row;
+}
+
+// edBuildChunkExpanded — fills the expanded body with full chunk text, the
+// per-chunk stats grid, and the tier-tabbed activity launcher.
+function edBuildChunkExpanded(e,ei,ci,ch,c){
+  const p=e.prog?.[ci]||{f:new Set(),s:new Set(),m:new Set(),best:{},bestTime:{}};
+
+  // Full text in scrollable cue-box-style container
+  const txt=document.createElement('div');txt.className='ed-chunk-text';txt.textContent=ch.trim();c.appendChild(txt);
+
+  // Per-chunk stats — only show entries we actually have data for
+  const stats=document.createElement('div');stats.className='ed-chunk-stats';
+  const items=[];
+  // Personal-best % for each activity that's been attempted.
+  // v36 — Skip Recite-tier activities; those are warm-up exercises whose
+  // accuracy scores aren't meaningful as recall measurements. Only Retain
+  // and Remember tier bests are surfaced per-chunk.
+  [...ACTS.s,...ACTS.m].forEach(a=>{
+    const b=p.best?.[a.k];
+    if(b!=null&&b>0)items.push({lbl:a.nm.toUpperCase(),val:b+'%'});
+  });
+  if(p.mastered){
+    items.push({lbl:'SR STAGE',val:`${srStage(p.reviewCount)} / 4`});
+    if(p.nextReview){
+      const d=daysDiff(localDateKey(),localDateKey(new Date(p.nextReview)));
+      items.push({lbl:'NEXT REVIEW',val:d<=0?'Due now':d===1?'Tomorrow':`In ${d} days`});
+    }
+  }
+  if(p.lastReviewedAt){
+    const d=Math.floor((Date.now()-p.lastReviewedAt)/86400000);
+    items.push({lbl:'LAST PRACTICED',val:d===0?'Today':d===1?'Yesterday':`${d} days ago`});
+  }
+  if(items.length===0)items.push({lbl:'STATUS',val:'Not yet practiced'});
+  items.forEach(it=>{
+    const d=document.createElement('div');d.className='ed-chunk-stat';
+    d.innerHTML=`<div class="lbl">${esc(it.lbl)}</div><div class="val">${esc(it.val)}</div>`;
+    stats.appendChild(d);
+  });
+  c.appendChild(stats);
+
+  // Tier tabs — Recite unlocked always; Retain needs 3 Recite done; Remember needs 2 Retain done
+  const fSz=p.f?.size||0,sSz=p.s?.size||0;
+  const locked={f:false,s:fSz<3,m:sSz<2};
+
+  const lh=document.createElement('div');lh.className='ed-launcher-hdr';lh.textContent='PRACTICE THIS CHUNK';c.appendChild(lh);
+  const tabs=document.createElement('div');tabs.className='ed-act-tabs';
+  ['f','s','m'].forEach(t=>{
+    const b=document.createElement('button');
+    b.className='ed-act-tab '+TIER_CLS[t].replace('p','t');
+    b.textContent=TIER_LBL[t];
+    b.dataset.tier=t;
+    if(locked[t])b.classList.add('locked');
+    tabs.appendChild(b);
+  });
+  c.appendChild(tabs);
+
+  const gridWrap=document.createElement('div');c.appendChild(gridWrap);
+
+  // showTier — swaps the active tab + renders the activity grid for that tier
+  function showTier(t){
+    tabs.querySelectorAll('.ed-act-tab').forEach(b=>b.classList.toggle('on',b.dataset.tier===t));
+    gridWrap.innerHTML='';
+    if(locked[t]){
+      const m=document.createElement('div');m.className='ed-act-locked-msg';
+      m.textContent=t==='s'?`Complete 3 Recite activities first (${fSz} / 3 done).`:`Complete 2 Retain activities first (${sSz} / 2 done).`;
+      gridWrap.appendChild(m);
+      return;
+    }
+    const grid=document.createElement('div');grid.className='ed-act-grid';
+    ACTS[t].forEach(a=>{
+      const done=p[t]?.has(a.k);
+      const card=document.createElement('div');
+      card.className='ed-act-card'+(done?' done':'');
+      card.innerHTML=`<div class="ic">${a.ic}</div><div class="nm">${esc(a.nm)}</div><div class="de">${esc(a.de)}</div>`;
+      card.onclick=()=>edLaunchActivity(ei,ci,t,a.k);
+      grid.appendChild(card);
+    });
+    gridWrap.appendChild(grid);
+  }
+
+  tabs.querySelectorAll('.ed-act-tab').forEach(b=>{
+    b.onclick=()=>{if(!b.classList.contains('locked'))showTier(b.dataset.tier);};
+  });
+  // Default to the highest unlocked tier so returning users land on what they're currently working through
+  showTier(!locked.m?'m':!locked.s?'s':'f');
+}
+
+// edLaunchActivity — bridge from hub into practice. Loads the essay, opens the
+// chunk, switches to the chosen tier, then immediately starts the activity
+// rather than just landing on the chunks screen.
+// v35 — Records the return context (G.edReturnEi) so the activity-screen back
+// button knows to send the user back to the essay detail page rather than to
+// the old chunks screen. The flag is cleared whenever the user navigates to
+// the home screen via the back button.
+function edLaunchActivity(ei,ci,tier,actKey){
+  G.edReturnEi=ei;
+  loadEssayInto(ei);
+  openChunk(ci);
+  switchTier(tier);
+  startAct(tier,actKey);
+}
+
 function renderEssaysTab(){
   renderSidebar();
   const list=document.getElementById('essays-list');list.innerHTML='';
@@ -3798,6 +4256,10 @@ function renderEssaysTab(){
     const dueLbl=e.dueDate?fmtDueDate(e.dueDate):'No due date';
     const dueIcon=e.dueDate?'📅':'∞';
     const row=document.createElement('div');row.className='essay-row';
+    // v34 — Row no longer expands inline. The header IS the whole row, and
+    // clicking it anywhere navigates to the dedicated essay detail screen
+    // where edit/delete/due-date controls now live. The chevron is purely
+    // a visual hint that this row is a navigable link.
     row.innerHTML=`
       <div class="essay-row-hdr">
         <span class="e-title">${esc(e.title)}</span>
@@ -3805,64 +4267,8 @@ function renderEssaysTab(){
         <span class="e-meta">${mastered}/${totalChunks} mastered</span>
         <div class="e-bar"><div class="e-bar-fill" style="width:${pct}%"></div></div>
         <span class="e-chev">›</span>
-      </div>
-      <div class="essay-row-body">
-        <div class="essay-actions">
-          <button class="bs sm" data-action="edit">✏️ Edit</button>
-          <button class="bs sm" data-action="delete">🗑️ Delete</button>
-        </div>
-        <div class="essay-due-bar">
-          <span class="edb-lbl">Due date</span>
-          <input type="date" data-action="duedate" value="${e.dueDate||''}" ${e.dueDate?'':'disabled'}>
-          <label class="edb-nodue"><input type="checkbox" data-action="nodue" ${e.dueDate?'':'checked'}> No due date</label>
-        </div>
-        <div class="essay-chunks-grid"></div>
       </div>`;
-    const hdr=row.querySelector('.essay-row-hdr');
-    hdr.addEventListener('click',()=>{
-      const wasOpen=row.classList.contains('open');
-      document.querySelectorAll('.essay-row').forEach(r=>r.classList.remove('open'));
-      if(!wasOpen){
-        row.classList.add('open');
-        buildEssayChunksInto(row.querySelector('.essay-chunks-grid'),ei);
-      }
-    });
-    row.querySelector('[data-action="edit"]').addEventListener('click',ev=>{ev.stopPropagation();openEditFor(ei);});
-    row.querySelector('[data-action="delete"]').addEventListener('click',ev=>{
-      ev.stopPropagation();
-      if(confirm(`Delete "${e.title}"? This cannot be undone.`)){
-        G.essays.splice(ei,1);
-        if(G.essayIdx>=G.essays.length)G.essayIdx=Math.max(0,G.essays.length-1);
-        savePersist();renderEssaysTab();
-      }
-    });
-    // Inline due-date control — auto-saves on change, updates the header pill in place
-    // so the row doesn't collapse mid-edit.
-    const dInp=row.querySelector('[data-action="duedate"]');
-    const dNo=row.querySelector('[data-action="nodue"]');
-    const refreshDuePill=()=>{
-      const el=row.querySelector('.e-due');
-      const ds=dueState(e.dueDate);
-      const lbl=e.dueDate?fmtDueDate(e.dueDate):'No due date';
-      const ic=e.dueDate?'📅':'∞';
-      el.className='e-due '+ds;
-      el.textContent=`${ic} ${lbl}`;
-    };
-    dNo.addEventListener('click',ev=>ev.stopPropagation());
-    dInp.addEventListener('click',ev=>ev.stopPropagation());
-    dNo.addEventListener('change',ev=>{
-      ev.stopPropagation();
-      if(dNo.checked){dInp.disabled=true;dInp.value='';e.dueDate=null;}
-      else{dInp.disabled=false;dInp.focus();}
-      savePersist();refreshDuePill();
-    });
-    dInp.addEventListener('change',ev=>{
-      ev.stopPropagation();
-      e.dueDate=dInp.value||null;
-      if(!e.dueDate)dNo.checked=true;
-      applyDueDateClampToEssay(e);
-      savePersist();refreshDuePill();
-    });
+    row.addEventListener('click',()=>openEssayDetail(ei));
     list.appendChild(row);
   });
 }
@@ -4329,6 +4735,10 @@ document.getElementById('btn-add-essay').addEventListener('click',()=>{
 
 // Go to home function — used by back nav from activity screen
 function goHome(){
+  // v35 — Clear the essay-detail return flag when navigating to home. This
+  // prevents a stale value from sending the user to the wrong essay after a
+  // future activity launch from somewhere other than the detail screen.
+  G.edReturnEi=null;
   document.getElementById('sb').classList.add('hide');
   switchHomeTab(activeTab);
   SS('home');
