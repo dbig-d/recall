@@ -362,6 +362,44 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .ed-act-pb.high .ed-act-pb-val { color:#22c55e; }
 .ed-act-pb.mid  .ed-act-pb-val { color:var(--orange); }
 .ed-act-pb.low  .ed-act-pb-val { color:var(--red); }
+
+/* v39 — Difficulty selector pill, top-right of activity cards.
+   The card itself needs position:relative so the absolute-positioned
+   pill and menu anchor to it. The pill stays on top of the card click
+   surface (z-index:2) and stops its own clicks from triggering the
+   card's main onClick. */
+.ed-act-card { position:relative; }
+.ed-act-diff { position:absolute; top:.55rem; right:.55rem; font-family:var(--fm); font-size:.55rem; letter-spacing:.12em; padding:.28rem .6rem; border-radius:999px; border:1px solid; background:var(--surface); cursor:pointer; z-index:2; }
+.ed-act-diff.easy { color:#22c55e; border-color:#22c55e; }
+.ed-act-diff.mid  { color:var(--orange); border-color:var(--orange); }
+.ed-act-diff.hard { color:var(--red); border-color:var(--red); }
+.ed-act-diff:hover { filter:brightness(1.3); }
+.ed-act-diff-menu { position:absolute; top:2.15rem; right:.55rem; z-index:10; background:var(--surface); border:1px solid var(--border2); border-radius:var(--r); padding:.4rem; display:flex; flex-direction:column; gap:.3rem; box-shadow:0 6px 18px rgba(0,0,0,.5); }
+.ed-act-diff-opt { font-family:var(--fm); font-size:.6rem; letter-spacing:.1em; padding:.45rem .85rem; background:var(--surface2); border:1px solid; border-radius:999px; cursor:pointer; text-align:center; min-width:104px; }
+.ed-act-diff-opt.easy { color:#22c55e; border-color:#22c55e; }
+.ed-act-diff-opt.mid  { color:var(--orange); border-color:var(--orange); }
+.ed-act-diff-opt.hard { color:var(--red); border-color:var(--red); }
+.ed-act-diff-opt:hover { filter:brightness(1.3); }
+
+/* v39 — Title tiers. Apprentice is the default look (no styling change).
+   Each subsequent tier adds a piece of visual identity: colour, then weight
+   and glow, then a level-number ring, and finally an animated gradient
+   for Legend. The class is applied to both sb-title (stats bar) and
+   sb-lvl-title (sidebar) so the user sees consistent identity across the
+   two surfaces. */
+#sb-title.tt-scholar, #sb-lvl-title.tt-scholar { color:var(--fam); letter-spacing:.04em; }
+#sb-title.tt-recall-artist, #sb-lvl-title.tt-recall-artist { color:var(--sol); font-weight:600; text-shadow:0 0 12px rgba(167,139,250,.4); }
+#sb-title.tt-memory-architect, #sb-lvl-title.tt-memory-architect { color:var(--mas); text-shadow:0 0 16px rgba(245,200,66,.35); }
+#sb-title.tt-legend, #sb-lvl-title.tt-legend {
+  background:linear-gradient(135deg, var(--red), var(--orange), var(--mas));
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+  animation:legend-hue-spin 8s linear infinite;
+  font-weight:700; letter-spacing:.05em;
+}
+@keyframes legend-hue-spin { 0% { filter:hue-rotate(0deg); } 100% { filter:hue-rotate(360deg); } }
+/* Memory Architect: the level number beside the title in the sidebar gets a
+   small gold ring around it. Only the number, not the LVL label. */
+#sb-lvl-num.lvring { border:1.5px solid var(--mas); border-radius:50%; padding:2px 6px; display:inline-block; line-height:1; }
 .ed-act-card.done .nm::after { content:' ✓'; color:var(--mas); margin-left:.15rem; }
 .ed-act-card.locked { opacity:.45; cursor:not-allowed; }
 .ed-act-card.locked .nm::after { content:' 🔒'; }
@@ -1278,8 +1316,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 // they differ. To ship a new version: increment CURRENT_VERSION, add an entry
 // to CHANGELOG at the top of the list. Brand-new users (no app data at all)
 // skip the popup — they get a fresh start, not an update notification.
-const CURRENT_VERSION='38';
+const CURRENT_VERSION='39';
 const CHANGELOG={
+  '39':{date:'May 2026',items:[
+    'Type First Letter and Word Bank Fill now have three difficulty modes — easy, medium, and hard — selectable from a small pill in the top-right corner of each activity card.',
+    'Easy and medium attempts still earn XP and update their own personal best, but only beating an activity on hard counts toward unlocking the next tier and mastering the chunk.',
+    'The personal best shown on each card now reflects your best for the currently-selected difficulty, with the same colour band (green/orange/red) as before.',
+    'Title tiers in the sidebar are now visually distinct: Scholar in blue, Recall Artist in glowing purple, Memory Architect in gold with a ring around the level number, and Legend in an animated red-orange-gold gradient that slowly shifts hue.'
+  ]},
   '38':{date:'May 2026',items:[
     'The "Practice this chunk" section is now visually weightier — bigger header, larger activity cards — to reflect that it\'s the primary action surface on the expanded chunk view.',
     'Personal bests are now shown inside the activity card they belong to, rather than in a separate list above. Each PB is colour-coded: green at 80% and above, orange between 50% and 80%, red below 50%.',
@@ -1569,6 +1613,10 @@ function renderEssayList(){
   });
 }
 function isMasteredInProg(prog,i){if(!prog[i])return false;const p=prog[i];return p.f&&p.f.size>=3&&p.s&&p.s.size>=2&&p.m&&p.m.size>=1;}
+// v39 — TFL and WBF support easy/medium/hard difficulty. Storage lives at
+// p.diff[actKey]; default is 'hard' so existing chunks (and chunks the user
+// has never opened a difficulty menu on) behave exactly as in v38 and prior.
+function getActDiff(p,k){return (p.diff&&p.diff[k])||'hard';}
 function loadEssay(i){
   G.essayIdx=i;const e=G.essays[i];
   G.chunks=e.chunks;
@@ -1932,8 +1980,13 @@ function doWordBankFill(ch){
     setTimeout(()=>completeAct(80),400);
     return;
   }
-  // Pick 25% (clamped to a reasonable range) — feels challenging without being overwhelming
-  const targetCount=Math.max(2,Math.min(candidates.length,Math.round(candidates.length*0.25)));
+  // v39 — Difficulty determines how dense the puzzle is. Easy makes 5% of
+  // long-word candidates into blanks, Medium 15%, Hard 25% (the v38 value).
+  // The Math.max(2,...) clamp still applies because below two blanks the
+  // exercise becomes trivial — a single-chip drag isn't a memory test.
+  const _p=G.prog[G.cur];const _d=getActDiff(_p,'wbf');
+  const _frac=_d==='easy'?0.05:_d==='medium'?0.15:0.25;
+  const targetCount=Math.max(2,Math.min(candidates.length,Math.round(candidates.length*_frac)));
   // Shuffle candidates and take the target count
   const shuffled=[...candidates].sort(()=>Math.random()-0.5);
   const chosen=shuffled.slice(0,targetCount).sort((a,b)=>a.i-b.i);
@@ -2117,15 +2170,37 @@ function doTypeFL(ch){
   let ci=0,mistakes=0;
   const p=G.prog[G.cur];
   const pbMs=p.bestTime&&p.bestTime['tfl']?p.bestTime['tfl']:null;
+  // v39 — Difficulty selects which word indices require typing. Easy 35%,
+  // Medium 75%, Hard 100%. Non-active words are rendered already revealed
+  // and the advance logic skips them when stepping to the next word.
+  const _diff=getActDiff(p,'tfl');
+  const _frac=_diff==='easy'?0.35:_diff==='medium'?0.75:1;
+  const _active=new Set();
+  if(_frac>=1){words.forEach((_,i)=>_active.add(i));}
+  else {
+    const _n=Math.max(1,Math.round(words.length*_frac));
+    const _shuf=words.map((_,i)=>i).sort(()=>Math.random()-0.5).slice(0,_n);
+    _shuf.forEach(i=>_active.add(i));
+  }
+  // First active index is the initial 'cu' (current) word; words before it
+  // that are non-active just show their text as already revealed.
+  let _firstActive=words.findIndex((_,i)=>_active.has(i));
   PC().appendChild(mkP('Type only the first letter of each word — the full word appears when correct:'));
   const disp=document.createElement('div');disp.className='twd';
   const wsp=words.map((w,i)=>{
     const s=document.createElement('span');
-    s.className='tw'+(i===0?' cu':' pe');
-    s.textContent='_'.repeat(w.length);
+    if(!_active.has(i)){
+      s.className='tw ok';
+      s.textContent=w+' ';
+    } else {
+      s.className='tw'+(i===_firstActive?' cu':' pe');
+      s.textContent='_'.repeat(w.length);
+    }
     s.dataset.w=w;s.dataset.i=i;
     return s;
   });
+  // ci starts at the first active index, not 0
+  ci=_firstActive>=0?_firstActive:0;
   wsp.forEach(s=>disp.appendChild(s));PC().appendChild(disp);
   // Ghost bar — only shown if a previous PB exists
   if(pbMs){PC().appendChild(makeGhostBar(pbMs));}
@@ -2141,12 +2216,17 @@ function doTypeFL(ch){
   const accTrack=document.createElement('div');accTrack.style.cssText='width:100%;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;';
   const accFill=document.createElement('div');accFill.style.cssText='height:100%;width:100%;border-radius:3px;background:var(--green);transition:width .3s,background .3s;';
   accTrack.appendChild(accFill);accWrap.appendChild(accLbl);accWrap.appendChild(accTrack);PC().appendChild(accWrap);
-  function upAcc(){const pct=Math.max(0,Math.round(100-((mistakes/words.length)*100)));document.getElementById('tfl-acc').textContent=pct+'%';accFill.style.width=pct+'%';accFill.style.background=pct>=80?'var(--green)':pct>=50?'var(--gold)':'var(--red)';}
+  function upAcc(){const _denom=Math.max(1,_active.size);const pct=Math.max(0,Math.round(100-((mistakes/_denom)*100)));document.getElementById('tfl-acc').textContent=pct+'%';accFill.style.width=pct+'%';accFill.style.background=pct>=80?'var(--green)':pct>=50?'var(--gold)':'var(--red)';}
   function adv(){
     const exp=words[ci][0].toLowerCase();const ty=inp.value.toLowerCase();inp.value='';
-    if(ty===exp){playClick();wsp[ci].className='tw ok';wsp[ci].textContent=words[ci]+' ';ci++;const p2=(ci/words.length)*100;setP(p2,`${ci}/${words.length} words`);
+    if(ty===exp){playClick();wsp[ci].className='tw ok';wsp[ci].textContent=words[ci]+' ';ci++;
+      // v39 — Skip over any non-active words so the user's next target is the
+      // next word that actually requires typing under the current difficulty.
+      while(ci<words.length&&!_active.has(ci))ci++;
+      const p2=(ci/words.length)*100;setP(p2,`${ci}/${words.length} words`);
       if(ci>=words.length){
-        const fa=Math.max(0,Math.round(100-((mistakes/words.length)*100)));
+        const _denom=Math.max(1,_active.size);
+        const fa=Math.max(0,Math.round(100-((mistakes/_denom)*100)));
         if(fa>=80){setTimeout(()=>completeAct(fa),300);}
         else{toast('💪',`${fa}% accuracy — need 80% to pass. Try again!`);setP(fa,'Needs retry');}
       }
@@ -2162,7 +2242,7 @@ function doTypeFL(ch){
     if(inp.value.length===1)adv();
   });
   setTimeout(()=>inp.focus(),100);
-  PA().appendChild(mkBS('SKIP WORD',()=>{if(ci<words.length){mistakes++;upAcc();wsp[ci].className='tw pe';wsp[ci].textContent=words[ci];ci++;if(ci<words.length){wsp[ci].className='tw cu';wsp[ci].textContent='_'.repeat(words[ci].length);hw.textContent=`Word ${ci+1} of ${words.length}`;}setP((ci/words.length)*100,`${ci}/${words.length} words`);if(ci>=words.length){const fa=Math.max(0,Math.round(100-((mistakes/words.length)*100)));setTimeout(()=>completeAct(fa),300);}inp.focus();}}));
+  PA().appendChild(mkBS('SKIP WORD',()=>{if(ci<words.length){mistakes++;upAcc();wsp[ci].className='tw pe';wsp[ci].textContent=words[ci];ci++;while(ci<words.length&&!_active.has(ci))ci++;if(ci<words.length){wsp[ci].className='tw cu';wsp[ci].textContent='_'.repeat(words[ci].length);hw.textContent=`Word ${ci+1} of ${words.length}`;}setP((ci/words.length)*100,`${ci}/${words.length} words`);if(ci>=words.length){const _denom=Math.max(1,_active.size);const fa=Math.max(0,Math.round(100-((mistakes/_denom)*100)));setTimeout(()=>completeAct(fa),300);}inp.focus();}}));
 }
 
 // ===== SCRAMBLE =====
@@ -2351,10 +2431,27 @@ function calcBossXp(chunkText,isRepeat){
 function completeAct(score){
   clearTmr();stopMic();
   const i=G.cur;const t=G.tier;const k=G.act;const p=G.prog[i];
+  // v39 — TFL and WBF have difficulty modes. The activity counts toward
+  // tier-progression (the p.f / p.s / p.m Sets that drive tier unlock and
+  // chunk mastery) only on Hard. Easy and Medium attempts still earn XP,
+  // still update PB per difficulty, still count toward streak — they just
+  // don't tick the "this activity is complete" box.
+  const _diff=(k==='tfl'||k==='wbf')?getActDiff(p,k):'hard';
   const alreadyDone=p[t].has(k);
-  p[t].add(k);
+  if(_diff==='hard')p[t].add(k);
   if(!p.best)p.best={};
-  if(p.best[k]==null||score>p.best[k])p.best[k]=score;
+  if(k==='tfl'||k==='wbf'){
+    // Per-difficulty PB always updates so the user sees their progress on
+    // whichever difficulty they're currently practicing. The global
+    // p.best[k] only updates on hard so the Personal Bests page keeps
+    // showing the canonical "best on the real difficulty" score.
+    if(!p.bestD)p.bestD={};
+    if(!p.bestD[k])p.bestD[k]={};
+    if(p.bestD[k][_diff]==null||score>p.bestD[k][_diff])p.bestD[k][_diff]=score;
+    if(_diff==='hard'&&(p.best[k]==null||score>p.best[k]))p.best[k]=score;
+  } else {
+    if(p.best[k]==null||score>p.best[k])p.best[k]=score;
+  }
   // Save PB time for ghost on successful tfl/fr attempts
   if(score>=80)ghostSaveTime(k);
   else ghostReset();
@@ -2854,7 +2951,8 @@ function savePersist(){
         prog:Object.fromEntries(Object.entries(e.prog||{}).map(([k,p])=>([k,{
           f:[...p.f],s:[...p.s],m:[...p.m],
           mastered:p.mastered,best:p.best||{},bestTime:p.bestTime||{},
-          masteredAt:p.masteredAt||null,nextReview:p.nextReview||null,reviewCount:p.reviewCount||0,lastReviewedAt:p.lastReviewedAt||null
+          masteredAt:p.masteredAt||null,nextReview:p.nextReview||null,reviewCount:p.reviewCount||0,lastReviewedAt:p.lastReviewedAt||null,
+          diff:p.diff||{},bestD:p.bestD||{}
         }])))
       })),
       essayIdx:G.essayIdx, xp:G.xp, lv:G.lv, streak:G.streak,
@@ -2872,7 +2970,8 @@ function loadPersist(){
       const prog={};
       Object.entries(e.prog||{}).forEach(([k,p])=>{
         prog[k]={f:new Set(p.f),s:new Set(p.s),m:new Set(p.m),mastered:p.mastered,best:p.best||{},bestTime:p.bestTime||{},
-          masteredAt:p.masteredAt||null,nextReview:p.nextReview||null,reviewCount:p.reviewCount||0,lastReviewedAt:p.lastReviewedAt||null};
+          masteredAt:p.masteredAt||null,nextReview:p.nextReview||null,reviewCount:p.reviewCount||0,lastReviewedAt:p.lastReviewedAt||null,
+          diff:p.diff||{},bestD:p.bestD||{}};
       });
       return{title:e.title,chunks:e.chunks,prog,bossBeaten:!!e.bossBeaten,bossBeatenAt:e.bossBeatenAt||null,dueDate:e.dueDate||null};
     });
@@ -3415,11 +3514,37 @@ function playBossVictory(){
 // ========== LEVEL TITLES ==========
 const TITLES=[[1,'Apprentice'],[4,'Scholar'],[7,'Recall Artist'],[11,'Memory Architect'],[16,'Legend']];
 function getTitle(lv){let t='Apprentice';for(const[l,n]of TITLES){if(lv>=l)t=n;}return t;}
+// v39 — Return the CSS class for a given level's title tier. The five
+// tiers map to progressively weightier visual treatments (colour, glow,
+// ring, animated gradient). Used to keep the styling logic in one place.
+function getTitleTier(lv){
+  if(lv>=16)return 'tt-legend';
+  if(lv>=11)return 'tt-memory-architect';
+  if(lv>=7)return 'tt-recall-artist';
+  if(lv>=4)return 'tt-scholar';
+  return 'tt-apprentice';
+}
 function upLevelTitle(lv){
-  const el=document.getElementById('sb-title');
-  if(!el)return;
-  el.textContent=getTitle(lv);
-  el.style.display='';
+  const tier=getTitleTier(lv);
+  const lblTxt=getTitle(lv);
+  // Both title surfaces (stats bar and sidebar) get the same tier class so
+  // the user's identity reads consistently across the app.
+  ['sb-title','sb-lvl-title'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.textContent=lblTxt;
+    el.className=el.className.replace(/\btt-\S+/g,'').trim();
+    el.classList.add(tier);
+    if(id==='sb-title')el.style.display='';
+  });
+  // Memory Architect gets a small gold ring around the level number.
+  // We toggle here on every title update so the ring appears as soon as
+  // the user reaches level 11 and disappears if they ever go back below.
+  const numEl=document.getElementById('sb-lvl-num');
+  if(numEl){
+    if(tier==='tt-memory-architect')numEl.classList.add('lvring');
+    else numEl.classList.remove('lvring');
+  }
 }
 
 // ========== IMPROVED SPEECH SCORER ==========
@@ -4245,16 +4370,63 @@ function edBuildChunkExpanded(e,ei,ci,ch,c){
     const grid=document.createElement('div');grid.className='ed-act-grid';
     ACTS[t].forEach(a=>{
       const done=p[t]?.has(a.k);
-      // v38 — PB rendered inside the card itself rather than in a separate
-      // stats section. Only Retain (s) and Remember (m) cards show it; Recite
-      // scores aren't meaningful recall measurements (see v36 rationale).
-      // Colour band: green ≥80, orange 50-79, red <50.
-      const b=(t==='s'||t==='m')?p.best?.[a.k]:null;
+      // v39 — TFL and WBF carry their own difficulty per chunk. The pill
+      // shown at top-right reflects the current setting; clicking it opens
+      // a small menu. The PB displayed at the bottom of the card is the
+      // best score *for that difficulty*, since difficulty fundamentally
+      // changes what the activity asks of the user.
+      const hasDiff=(a.k==='tfl'||a.k==='wbf');
+      const curDiff=hasDiff?getActDiff(p,a.k):null;
+      let b;
+      if(hasDiff){
+        b=p.bestD?.[a.k]?.[curDiff];
+      } else {
+        b=(t==='s'||t==='m')?p.best?.[a.k]:null;
+      }
       const pbHtml=(b!=null&&b>0)?`<div class="ed-act-pb ${b>=80?'high':b>=50?'mid':'low'}"><span>PB</span><span class="ed-act-pb-val">${b}%</span></div>`:'';
+      const diffCls=curDiff==='easy'?'easy':curDiff==='medium'?'mid':'hard';
+      const diffPill=hasDiff?`<button class="ed-act-diff ${diffCls}">${curDiff.toUpperCase()}</button>`:'';
       const card=document.createElement('div');
       card.className='ed-act-card'+(done?' done':'');
-      card.innerHTML=`<div class="ic">${a.ic}</div><div class="nm">${esc(a.nm)}</div><div class="de">${esc(a.de)}</div>${pbHtml}`;
+      card.innerHTML=`${diffPill}<div class="ic">${a.ic}</div><div class="nm">${esc(a.nm)}</div><div class="de">${esc(a.de)}</div>${pbHtml}`;
       card.onclick=()=>edLaunchActivity(ei,ci,t,a.k);
+      // Wire the difficulty pill — clicking it must not also trigger the
+      // card's main launch handler, so we stopPropagation. The menu is
+      // built lazily on first click and rebuilt each time so it shows the
+      // current selection.
+      if(hasDiff){
+        const pill=card.querySelector('.ed-act-diff');
+        pill.addEventListener('click',ev=>{
+          ev.stopPropagation();
+          // Close any other open menus across the page so we never have two
+          document.querySelectorAll('.ed-act-diff-menu').forEach(m=>m.remove());
+          const menu=document.createElement('div');menu.className='ed-act-diff-menu';
+          [['easy','EASY','easy'],['medium','MEDIUM','mid'],['hard','HARD','hard']].forEach(([val,lbl,cls])=>{
+            const opt=document.createElement('button');opt.className='ed-act-diff-opt '+cls;opt.textContent=lbl;
+            opt.addEventListener('click',e2=>{
+              e2.stopPropagation();
+              if(!p.diff)p.diff={};
+              p.diff[a.k]=val;
+              savePersist();
+              // Rebuild the expanded body in place. We keep references to
+              // the right essay (e), index (ei,ci), and chunk text (ch)
+              // because they're all in the enclosing closure.
+              const inner=card.closest('.ed-chunk-body-inner');
+              if(inner){inner.innerHTML='';edBuildChunkExpanded(e,ei,ci,ch,inner);}
+            });
+            menu.appendChild(opt);
+          });
+          card.appendChild(menu);
+          // Click-outside-to-close: register a one-shot document handler
+          // that removes the menu when the user clicks anywhere outside it.
+          // Using setTimeout(0) ensures the originating click event finishes
+          // bubbling before we install the listener.
+          setTimeout(()=>{
+            const close=evx=>{if(!menu.contains(evx.target)){menu.remove();document.removeEventListener('click',close);}};
+            document.addEventListener('click',close);
+          },0);
+        });
+      }
       grid.appendChild(card);
     });
     gridWrap.appendChild(grid);
