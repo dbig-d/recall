@@ -330,7 +330,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .ed-chunk-stat .val { font-family:var(--fd); font-size:.9rem; color:var(--text); }
 
 /* Activity launcher inside expanded chunk */
-.ed-launcher-hdr { font-family:var(--fm); font-size:.62rem; letter-spacing:.12em; color:var(--text3); margin-top:.5rem; }
+/* v38 — The Practice section is the primary actionable surface in the
+   expanded chunk view, so the header gets weight: bigger font, brighter
+   colour, more breathing room above it. The activity cards themselves
+   grow too — wider minmax keeps 3-across on typical viewports while each
+   card feels substantial rather than cramped. */
+.ed-launcher-hdr { font-family:var(--fd); font-size:1rem; letter-spacing:.14em; color:var(--text); margin-top:1rem; }
 .ed-act-tabs { display:flex; gap:.4rem; padding-bottom:.5rem; border-bottom:1px solid var(--border); }
 .ed-act-tab { font-family:var(--fm); font-size:.66rem; letter-spacing:.12em; padding:.45rem 1.1rem; background:none; border:1px solid var(--border); border-radius:999px; cursor:pointer; color:var(--text2); transition:all .15s; }
 .ed-act-tab.tf:hover:not(.locked) { color:var(--fam); border-color:var(--fam); }
@@ -340,12 +345,23 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .ed-act-tab.ts.on { background:var(--sol); color:var(--bg); border-color:var(--sol); }
 .ed-act-tab.tm.on { background:var(--mas); color:var(--bg); border-color:var(--mas); }
 .ed-act-tab.locked { opacity:.4; cursor:not-allowed; }
-.ed-act-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:.6rem; }
-.ed-act-card { background:var(--surface2); border:1px solid var(--border); border-radius:var(--r); padding:.85rem 1rem; cursor:pointer; transition:border-color .15s, transform .15s; display:flex; flex-direction:column; gap:.3rem; }
+.ed-act-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.85rem; }
+.ed-act-card { background:var(--surface2); border:1px solid var(--border); border-radius:var(--r); padding:1.25rem 1.35rem; cursor:pointer; transition:border-color .15s, transform .15s; display:flex; flex-direction:column; gap:.45rem; }
 .ed-act-card:hover { transform:translateY(-1px); border-color:var(--accent2); }
-.ed-act-card .ic { font-size:1.3rem; }
-.ed-act-card .nm { font-family:var(--fd); font-size:.82rem; letter-spacing:.02em; }
-.ed-act-card .de { font-size:.65rem; line-height:1.45; color:var(--text3); }
+.ed-act-card .ic { font-size:1.75rem; line-height:1; }
+.ed-act-card .nm { font-family:var(--fd); font-size:1rem; letter-spacing:.02em; }
+.ed-act-card .de { font-size:.75rem; line-height:1.55; color:var(--text3); }
+/* v38 — PB block lives at the bottom of each card, pushed there by
+   margin-top:auto so cards with and without PBs in the same row stay
+   aligned. Colour bands: green ≥80 (good recall), orange 50-79
+   (improving), red <50 (needs work). Only Retain and Remember tier
+   cards get this block — Recite scores aren't shown for the reasons
+   noted in v36. */
+.ed-act-pb { margin-top:auto; padding-top:.6rem; border-top:1px solid var(--border); display:flex; align-items:baseline; justify-content:space-between; font-family:var(--fm); font-size:.6rem; letter-spacing:.14em; color:var(--text3); }
+.ed-act-pb-val { font-family:var(--fd); font-size:1.15rem; letter-spacing:.01em; }
+.ed-act-pb.high .ed-act-pb-val { color:#22c55e; }
+.ed-act-pb.mid  .ed-act-pb-val { color:var(--orange); }
+.ed-act-pb.low  .ed-act-pb-val { color:var(--red); }
 .ed-act-card.done .nm::after { content:' ✓'; color:var(--mas); margin-left:.15rem; }
 .ed-act-card.locked { opacity:.45; cursor:not-allowed; }
 .ed-act-card.locked .nm::after { content:' 🔒'; }
@@ -1262,8 +1278,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 // they differ. To ship a new version: increment CURRENT_VERSION, add an entry
 // to CHANGELOG at the top of the list. Brand-new users (no app data at all)
 // skip the popup — they get a fresh start, not an update notification.
-const CURRENT_VERSION='37';
+const CURRENT_VERSION='38';
 const CHANGELOG={
+  '38':{date:'May 2026',items:[
+    'The "Practice this chunk" section is now visually weightier — bigger header, larger activity cards — to reflect that it\'s the primary action surface on the expanded chunk view.',
+    'Personal bests are now shown inside the activity card they belong to, rather than in a separate list above. Each PB is colour-coded: green at 80% and above, orange between 50% and 80%, red below 50%.',
+    'The per-chunk stats section is hidden entirely on never-practiced chunks instead of showing an empty placeholder.'
+  ]},
   '37':{date:'May 2026',items:[
     'Returning to an essay after finishing an activity now re-opens the chunk you were practicing, so you can pick another activity without re-clicking the row.',
     'The auto-close behavior for chunks is preserved — opening a different chunk still collapses the previously-open one.',
@@ -4165,17 +4186,13 @@ function edBuildChunkExpanded(e,ei,ci,ch,c){
   // Full text in scrollable cue-box-style container
   const txt=document.createElement('div');txt.className='ed-chunk-text';txt.textContent=ch.trim();c.appendChild(txt);
 
-  // Per-chunk stats — only show entries we actually have data for
-  const stats=document.createElement('div');stats.className='ed-chunk-stats';
+  // Per-chunk stats — non-activity-specific metadata only.
+  // v38 — Per-activity PB scores were removed from here and moved into the
+  // activity cards below, so the user sees which PB belongs to which activity
+  // at a glance without scanning a separate list. The stats container is
+  // only painted when there's at least one item to show — for unmastered,
+  // never-practiced chunks we'd otherwise leave an empty box.
   const items=[];
-  // Personal-best % for each activity that's been attempted.
-  // v36 — Skip Recite-tier activities; those are warm-up exercises whose
-  // accuracy scores aren't meaningful as recall measurements. Only Retain
-  // and Remember tier bests are surfaced per-chunk.
-  [...ACTS.s,...ACTS.m].forEach(a=>{
-    const b=p.best?.[a.k];
-    if(b!=null&&b>0)items.push({lbl:a.nm.toUpperCase(),val:b+'%'});
-  });
   if(p.mastered){
     items.push({lbl:'SR STAGE',val:`${srStage(p.reviewCount)} / 4`});
     if(p.nextReview){
@@ -4187,13 +4204,15 @@ function edBuildChunkExpanded(e,ei,ci,ch,c){
     const d=Math.floor((Date.now()-p.lastReviewedAt)/86400000);
     items.push({lbl:'LAST PRACTICED',val:d===0?'Today':d===1?'Yesterday':`${d} days ago`});
   }
-  if(items.length===0)items.push({lbl:'STATUS',val:'Not yet practiced'});
-  items.forEach(it=>{
-    const d=document.createElement('div');d.className='ed-chunk-stat';
-    d.innerHTML=`<div class="lbl">${esc(it.lbl)}</div><div class="val">${esc(it.val)}</div>`;
-    stats.appendChild(d);
-  });
-  c.appendChild(stats);
+  if(items.length>0){
+    const stats=document.createElement('div');stats.className='ed-chunk-stats';
+    items.forEach(it=>{
+      const d=document.createElement('div');d.className='ed-chunk-stat';
+      d.innerHTML=`<div class="lbl">${esc(it.lbl)}</div><div class="val">${esc(it.val)}</div>`;
+      stats.appendChild(d);
+    });
+    c.appendChild(stats);
+  }
 
   // Tier tabs — Recite unlocked always; Retain needs 3 Recite done; Remember needs 2 Retain done
   const fSz=p.f?.size||0,sSz=p.s?.size||0;
@@ -4226,9 +4245,15 @@ function edBuildChunkExpanded(e,ei,ci,ch,c){
     const grid=document.createElement('div');grid.className='ed-act-grid';
     ACTS[t].forEach(a=>{
       const done=p[t]?.has(a.k);
+      // v38 — PB rendered inside the card itself rather than in a separate
+      // stats section. Only Retain (s) and Remember (m) cards show it; Recite
+      // scores aren't meaningful recall measurements (see v36 rationale).
+      // Colour band: green ≥80, orange 50-79, red <50.
+      const b=(t==='s'||t==='m')?p.best?.[a.k]:null;
+      const pbHtml=(b!=null&&b>0)?`<div class="ed-act-pb ${b>=80?'high':b>=50?'mid':'low'}"><span>PB</span><span class="ed-act-pb-val">${b}%</span></div>`:'';
       const card=document.createElement('div');
       card.className='ed-act-card'+(done?' done':'');
-      card.innerHTML=`<div class="ic">${a.ic}</div><div class="nm">${esc(a.nm)}</div><div class="de">${esc(a.de)}</div>`;
+      card.innerHTML=`<div class="ic">${a.ic}</div><div class="nm">${esc(a.nm)}</div><div class="de">${esc(a.de)}</div>${pbHtml}`;
       card.onclick=()=>edLaunchActivity(ei,ci,t,a.k);
       grid.appendChild(card);
     });
