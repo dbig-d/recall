@@ -1262,8 +1262,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 // they differ. To ship a new version: increment CURRENT_VERSION, add an entry
 // to CHANGELOG at the top of the list. Brand-new users (no app data at all)
 // skip the popup — they get a fresh start, not an update notification.
-const CURRENT_VERSION='36';
+const CURRENT_VERSION='37';
 const CHANGELOG={
+  '37':{date:'May 2026',items:[
+    'Returning to an essay after finishing an activity now re-opens the chunk you were practicing, so you can pick another activity without re-clicking the row.',
+    'The auto-close behavior for chunks is preserved — opening a different chunk still collapses the previously-open one.',
+    'Editing an essay from the detail page now updates the page immediately rather than requiring you to navigate away and back.'
+  ]},
   '36':{date:'May 2026',items:[
     'Removed the redundant "Essays" button from the stats bar — the new essay detail screen replaces what it used to do, and the bar was blocking buttons on other screens.',
     'The stats bar now shows only during practice activities and the Recall boss battle; it no longer leaks onto the home, essay detail, or welcome screens.',
@@ -4109,6 +4114,17 @@ function renderEssayDetail(ei){
   // Build the chunk rows
   const cl=document.getElementById('ed-chunks-list');
   e.chunks.forEach((ch,ci)=>cl.appendChild(edBuildChunkRow(e,ei,ci,ch)));
+  // v37 — If we just returned from an activity, re-expand the chunk that was
+  // being practiced. Going through the row's own click handler keeps the
+  // close-others + lazy-build behaviour consistent with manual user clicks.
+  if(G.edReturnCi!=null){
+    const ci=G.edReturnCi;G.edReturnCi=null;
+    const targetRow=cl.querySelectorAll('.ed-chunk-row')[ci];
+    if(targetRow){
+      const hdr=targetRow.querySelector('.ed-chunk-hdr');
+      if(hdr){hdr.click();targetRow.scrollIntoView({behavior:'smooth',block:'center'});}
+    }
+  }
 }
 
 // edBuildChunkRow — collapsed-state markup for one chunk. The expanded body is
@@ -4233,8 +4249,12 @@ function edBuildChunkExpanded(e,ei,ci,ch,c){
 // button knows to send the user back to the essay detail page rather than to
 // the old chunks screen. The flag is cleared whenever the user navigates to
 // the home screen via the back button.
+// v37 — Also records the chunk index (G.edReturnCi) so renderEssayDetail can
+// re-expand the same chunk on return. This means the user picks another
+// activity for the same chunk without having to re-open the row.
 function edLaunchActivity(ei,ci,tier,actKey){
   G.edReturnEi=ei;
+  G.edReturnCi=ci;
   loadEssayInto(ei);
   openChunk(ci);
   switchTier(tier);
@@ -4714,6 +4734,14 @@ function openEditFor(i){
     document.getElementById('edit-modal').classList.remove('on');
     document.getElementById('em-save').onclick=defaultSaveHandler;
     savePersist();renderEssaysTab();
+    // v37 — If the essay detail screen is currently showing this essay,
+    // re-render it so the title/chunks update without requiring the user to
+    // navigate away and back. We check the active-class membership rather
+    // than just edCurrentEi because the same essay might be tracked as
+    // "current" even after the user has navigated elsewhere.
+    if(edCurrentEi===i&&document.getElementById('essay-detail').classList.contains('active')){
+      renderEssayDetail(i);
+    }
   };
   document.getElementById('edit-modal').classList.add('on');
 }
@@ -4738,7 +4766,10 @@ function goHome(){
   // v35 — Clear the essay-detail return flag when navigating to home. This
   // prevents a stale value from sending the user to the wrong essay after a
   // future activity launch from somewhere other than the detail screen.
+  // v37 — Same reasoning extends to the chunk index, which would otherwise
+  // cause a future detail-page open to expand an unrelated chunk.
   G.edReturnEi=null;
+  G.edReturnCi=null;
   document.getElementById('sb').classList.add('hide');
   switchHomeTab(activeTab);
   SS('home');
