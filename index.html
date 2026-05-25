@@ -146,6 +146,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .tw.pe { color:var(--text3); }
 .tw.cu { color:var(--gold); font-weight:700; background:rgba(245,200,66,.1); border-radius:4px; padding:0 4px; }
 .tw.ok { color:var(--green); }
+/* v41 — Per-word mistake colour-coding. warn = one wrong attempt before
+   getting it right (orange), bad = two or more wrong attempts before
+   getting it right (red). The classes apply when the word is revealed,
+   replacing the would-be .ok green. Skipped words remain .tw.pe (grey). */
+.tw.warn { color:var(--orange); }
+.tw.bad { color:var(--red); }
 
 /* v28 — Key Clauses Flip (Recite tier) */
 .kcf-stage { width:100%; perspective:1400px; display:flex; flex-direction:column; align-items:center; gap:1rem; }
@@ -1308,8 +1314,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 // they differ. To ship a new version: increment CURRENT_VERSION, add an entry
 // to CHANGELOG at the top of the list. Brand-new users (no app data at all)
 // skip the popup — they get a fresh start, not an update notification.
-const CURRENT_VERSION='40';
+const CURRENT_VERSION='41';
 const CHANGELOG={
+  '41':{date:'May 2026',items:[
+    'Type First Letter now shows punctuation in pending words from the start. A word like "GMO\u2019s" displays as ___\u2019_ (three underscores, apostrophe, one underscore) instead of five underscores, so word lengths read accurately.',
+    'When you get a word right on the first try it stays green. Take a second attempt and the revealed word shows in orange. Take three or more attempts and it shows in red. Skipped words remain grey as before.',
+    'The expected first letter is now the first alphabetic character, so words starting with punctuation like "\u2019tis" or numbers like "100mg" work cleanly. Tokens that contain no letters at all (pure numbers, pure punctuation) are auto-revealed.'
+  ]},
   '40':{date:'May 2026',items:[
     'Finishing an activity now takes you back to the essay detail page you launched it from, with the chunk you just practiced still expanded — no more dropping back onto the old activity-card screen.',
     'Type First Letter no longer blocks you at 80% accuracy. Any finish records the score so you can track improvement; only beating the activity on Hard at 80%+ still counts as actual completion.',
@@ -2127,18 +2138,38 @@ function stopMic(){G.mic=false;if(G.rec){try{G.rec.stop();}catch(e){}G.rec=null;
 function doTypeFL(ch){
   const words=ch.trim().split(/\s+/).filter(w=>w.length>0);
   let ci=0,mistakes=0;
+  // v41 — Per-word mistake counter. Reset each time the cursor advances to a
+  // new word; consulted at reveal time to pick the colour (green/orange/red).
+  let wm=0;
   const p=G.prog[G.cur];
   const pbMs=p.bestTime&&p.bestTime['tfl']?p.bestTime['tfl']:null;
+  // v41 — Helpers. maskWord replaces only alphabetic characters with
+  // underscores, leaving apostrophes, hyphens, commas, full stops and any
+  // other punctuation visible from the start. firstLetter finds the first
+  // alphabetic character in a token (so "'tis" expects 't', "GMO's"
+  // expects 'g'); returns '' for tokens with no letters at all.
+  const maskWord=w=>w.replace(/[a-zA-Z]/g,'_');
+  const firstLetter=w=>{const m=w.match(/[a-zA-Z]/);return m?m[0].toLowerCase():'';};
   // v39 — Difficulty selects which word indices require typing. Easy 35%,
   // Medium 75%, Hard 100%. Non-active words are rendered already revealed
   // and the advance logic skips them when stepping to the next word.
+  // v41 — The candidate pool now excludes any token that contains no
+  // alphabetic characters, so words like "100" or "—" are auto-revealed
+  // regardless of difficulty rather than forcing an untyypable stop.
   const _diff=getActDiff(p,'tfl');
   const _frac=_diff==='easy'?0.35:_diff==='medium'?0.75:1;
   const _active=new Set();
-  if(_frac>=1){words.forEach((_,i)=>_active.add(i));}
+  const _candidates=words.map((w,i)=>firstLetter(w)?i:-1).filter(i=>i>=0);
+  if(_candidates.length===0){
+    // Nothing typeable in this chunk (extreme edge case — chunk is all
+    // numbers or punctuation). Auto-complete at 100% so the user isn't stuck.
+    setTimeout(()=>completeAct(100),200);
+    return;
+  }
+  if(_frac>=1){_candidates.forEach(i=>_active.add(i));}
   else {
-    const _n=Math.max(1,Math.round(words.length*_frac));
-    const _shuf=words.map((_,i)=>i).sort(()=>Math.random()-0.5).slice(0,_n);
+    const _n=Math.max(1,Math.round(_candidates.length*_frac));
+    const _shuf=[..._candidates].sort(()=>Math.random()-0.5).slice(0,_n);
     _shuf.forEach(i=>_active.add(i));
   }
   // First active index is the initial 'cu' (current) word; words before it
@@ -2153,7 +2184,7 @@ function doTypeFL(ch){
       s.textContent=w+' ';
     } else {
       s.className='tw'+(i===_firstActive?' cu':' pe');
-      s.textContent='_'.repeat(w.length);
+      s.textContent=maskWord(w);
     }
     s.dataset.w=w;s.dataset.i=i;
     return s;
@@ -2177,11 +2208,20 @@ function doTypeFL(ch){
   accTrack.appendChild(accFill);accWrap.appendChild(accLbl);accWrap.appendChild(accTrack);PC().appendChild(accWrap);
   function upAcc(){const _denom=Math.max(1,_active.size);const pct=Math.max(0,Math.round(100-((mistakes/_denom)*100)));document.getElementById('tfl-acc').textContent=pct+'%';accFill.style.width=pct+'%';accFill.style.background=pct>=80?'var(--green)':pct>=50?'var(--gold)':'var(--red)';}
   function adv(){
-    const exp=words[ci][0].toLowerCase();const ty=inp.value.toLowerCase();inp.value='';
-    if(ty===exp){playClick();wsp[ci].className='tw ok';wsp[ci].textContent=words[ci]+' ';ci++;
+    // v41 — Expected key is the first ALPHABETIC character (not just [0]),
+    // so words starting with punctuation like "'tis" work correctly.
+    const exp=firstLetter(words[ci]);const ty=inp.value.toLowerCase();inp.value='';
+    if(ty===exp){playClick();
+      // v41 — Reveal colour reflects how many mistakes happened on this
+      // specific word: 0 → green (got it first try), 1 → orange (took two
+      // tries), 2+ → red (took three or more). The class replaces the
+      // would-be .ok green directly so no extra DOM work is needed.
+      const _cls=wm===0?'ok':wm===1?'warn':'bad';
+      wsp[ci].className='tw '+_cls;wsp[ci].textContent=words[ci]+' ';ci++;
       // v39 — Skip over any non-active words so the user's next target is the
       // next word that actually requires typing under the current difficulty.
       while(ci<words.length&&!_active.has(ci))ci++;
+      wm=0;
       const p2=(ci/words.length)*100;setP(p2,`${ci}/${words.length} words`);
       if(ci>=words.length){
         const _denom=Math.max(1,_active.size);
@@ -2193,8 +2233,8 @@ function doTypeFL(ch){
         // gate here means a lower score is logged rather than swallowed.
         setTimeout(()=>completeAct(fa),300);
       }
-      else{wsp[ci].className='tw cu';wsp[ci].textContent='_'.repeat(words[ci].length);hw.textContent=`Word ${ci+1} of ${words.length}`;disp.scrollTop=disp.scrollHeight;}
-    }else{mistakes++;playWrong();upAcc();inp.style.borderColor='var(--red)';setTimeout(()=>inp.style.borderColor='var(--border2)',300);}
+      else{wsp[ci].className='tw cu';wsp[ci].textContent=maskWord(words[ci]);hw.textContent=`Word ${ci+1} of ${words.length}`;disp.scrollTop=disp.scrollHeight;}
+    }else{mistakes++;wm++;playWrong();upAcc();inp.style.borderColor='var(--red)';setTimeout(()=>inp.style.borderColor='var(--border2)',300);}
   }
   inp.addEventListener('keydown',e=>{
     ghostRecordStart();
@@ -2205,7 +2245,7 @@ function doTypeFL(ch){
     if(inp.value.length===1)adv();
   });
   setTimeout(()=>inp.focus(),100);
-  PA().appendChild(mkBS('SKIP WORD',()=>{if(ci<words.length){mistakes++;upAcc();wsp[ci].className='tw pe';wsp[ci].textContent=words[ci];ci++;while(ci<words.length&&!_active.has(ci))ci++;if(ci<words.length){wsp[ci].className='tw cu';wsp[ci].textContent='_'.repeat(words[ci].length);hw.textContent=`Word ${ci+1} of ${words.length}`;}setP((ci/words.length)*100,`${ci}/${words.length} words`);if(ci>=words.length){const _denom=Math.max(1,_active.size);const fa=Math.max(0,Math.round(100-((mistakes/_denom)*100)));setTimeout(()=>completeAct(fa),300);}inp.focus();}}));
+  PA().appendChild(mkBS('SKIP WORD',()=>{if(ci<words.length){mistakes++;upAcc();wsp[ci].className='tw pe';wsp[ci].textContent=words[ci];ci++;while(ci<words.length&&!_active.has(ci))ci++;wm=0;if(ci<words.length){wsp[ci].className='tw cu';wsp[ci].textContent=maskWord(words[ci]);hw.textContent=`Word ${ci+1} of ${words.length}`;}setP((ci/words.length)*100,`${ci}/${words.length} words`);if(ci>=words.length){const _denom=Math.max(1,_active.size);const fa=Math.max(0,Math.round(100-((mistakes/_denom)*100)));setTimeout(()=>completeAct(fa),300);}inp.focus();}}));
 }
 
 // ===== SCRAMBLE =====
