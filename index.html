@@ -1248,15 +1248,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 </div>
 
 <!-- CHUNKS -->
-<div class="screen" id="sc">
-  <div style="display:flex;align-items:center;gap:1rem;width:100%;">
-    <div style="flex:1"><div class="stitle" id="sc-title">YOUR CHUNKS</div><p class="ssub" id="sc-sub">Select a chunk to begin</p></div>
-    <button class="bp sm gold" id="btn-boss-replay" style="display:none;" onclick="window.startBossReplay&&window.startBossReplay()">💀 RECALL</button>
-    <button class="bs sm" id="btn-edit-essay">✏️ Edit</button>
-    <button class="bs sm" id="btn-switch-essay">📚 Essays</button>
-  </div>
-  <div class="cgrid" id="cgrid"></div>
-</div>
+<!-- v40 — Old sc screen removed; essay-detail is now the only chunk-selection surface -->
 
 <!-- v34 ESSAY DETAIL — populated dynamically by renderEssayDetail() -->
 <div class="screen" id="essay-detail"></div>
@@ -1316,8 +1308,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 // they differ. To ship a new version: increment CURRENT_VERSION, add an entry
 // to CHANGELOG at the top of the list. Brand-new users (no app data at all)
 // skip the popup — they get a fresh start, not an update notification.
-const CURRENT_VERSION='39';
+const CURRENT_VERSION='40';
 const CHANGELOG={
+  '40':{date:'May 2026',items:[
+    'Finishing an activity now takes you back to the essay detail page you launched it from, with the chunk you just practiced still expanded — no more dropping back onto the old activity-card screen.',
+    'Type First Letter no longer blocks you at 80% accuracy. Any finish records the score so you can track improvement; only beating the activity on Hard at 80%+ still counts as actual completion.',
+    'XP earned for Type First Letter and Word Bank Fill now scales with your accuracy. A 100% finish grants the full amount, a 50% finish grants half, with a floor of 1 XP so any completion is rewarded.',
+    'Word Bank Fill is denser on Medium and Hard: Medium now turns 20% of long words into blanks (was 15%) and Hard turns 35% (was 25%). Easy stays at 5%.',
+    'Changing difficulty on an activity card no longer snaps you to the Remember tier. The expanded chunk now stays on whichever tier you were viewing.'
+  ]},
   '39':{date:'May 2026',items:[
     'Type First Letter and Word Bank Fill now have three difficulty modes — easy, medium, and hard — selectable from a small pill in the top-right corner of each activity card.',
     'Easy and medium attempts still earn XP and update their own personal best, but only beating an activity on hard counts toward unlocking the next tier and mastering the chunk.',
@@ -1664,29 +1663,8 @@ window.startBossReplay=function(){
   const idxs=G.chunks.map((_,i)=>i).filter(i=>isMastered(i));
   if(idxs.length>0)showBossIntro(idxs,true);
 };
-function renderChunks(){
-  const e=G.essays[G.essayIdx];
-  const allMastered=G.chunks.length>0&&G.chunks.every((_,i)=>isMastered(i));
-  const bossBtn=document.getElementById('btn-boss-replay');
-  bossBtn.style.display=allMastered?'inline-flex':'none';
-  if(e){document.getElementById('sc-title').textContent=e.title;document.getElementById('sc-sub').textContent=`${e.chunks.length} chunks · ${G.chunks.filter((_,i)=>isMastered(i)).length} mastered`;}
-  const g=document.getElementById('cgrid');g.innerHTML='';
-  G.chunks.forEach((ch,i)=>{
-    const p=G.prog[i];
-    const card=document.createElement('div');
-    card.className='cc'+(isMastered(i)?' mastered':'')+(isDue(p,e&&e.dueDate)?' due':'');
-    const dueBadge=isDue(p,e&&e.dueDate)?`<div class="due-badge" title="Complete one Remember activity to reset this review">🔁 Due — do a Remember activity</div>`:'';
-    card.innerHTML=`<div class="cn">CHUNK ${i+1}${isMastered(i)?' ★':''}</div>
-<div class="cprev">${esc(ch.trim())}</div>
-<div class="ctiers">
-  <div class="ctrow"><span class="ctlbl" style="color:var(--fam)">Recite</span><div class="ctpips">${ACTS.f.map((_,j)=>`<div class="pip${j<p.f.size?' done f':''}"></div>`).join('')}</div></div>
-  <div class="ctrow"><span class="ctlbl" style="color:var(--sol)">Retain</span><div class="ctpips">${ACTS.s.map((_,j)=>`<div class="pip${j<p.s.size?' done s':''}"></div>`).join('')}</div></div>
-  <div class="ctrow"><span class="ctlbl" style="color:var(--mas)">Remember</span><div class="ctpips">${ACTS.m.map((_,j)=>`<div class="pip${j<p.m.size?' done m':''}"></div>`).join('')}</div></div>
-</div>${dueBadge}`;
-    card.addEventListener('click',()=>openChunk(i));
-    g.appendChild(card);
-  });
-}
+// v40 — renderChunks was removed along with the sc screen it rendered into.
+// The essay-detail screen builds its chunk rows directly via renderEssayDetail.
 
 // ========== ACTIVITY SCREEN ==========
 function openChunk(i){
@@ -1713,29 +1691,10 @@ document.getElementById('btn-btc').addEventListener('click',()=>{
     goHome();switchHomeTab('essays');
   }
 });
-document.getElementById('btn-switch-essay').addEventListener('click',openEssayModal);
-document.getElementById('btn-edit-essay').addEventListener('click',()=>{
-  const e=G.essays[G.essayIdx];
-  if(!e)return;
-  document.getElementById('em-name').value=e.title;
-  document.getElementById('em-text').value=e.chunks.join('\n\n');
-  setModalDueDate(e.dueDate||null);
-  setModalMode('edit');
-  document.getElementById('em-save').onclick=()=>{
-    const title=document.getElementById('em-name').value.trim()||e.title;
-    const text=document.getElementById('em-text').value.trim();
-    if(!text)return;
-    const raw=text.split(/\n\s*\n/).filter(c=>c.trim());
-    e.title=title; e.chunks=raw; e.dueDate=readModalDueDate();
-    applyDueDateClampToEssay(e);
-    // preserve prog for existing indices
-    raw.forEach((_,i)=>{if(!e.prog[i])e.prog[i]={f:new Set(),s:new Set(),m:new Set(),mastered:false,best:{},bestTime:{}};});
-    loadEssay(G.essayIdx);
-    // restore default save handler
-    document.getElementById('em-save').onclick=defaultSaveHandler;
-  };
-  document.getElementById('edit-modal').classList.add('on');
-});
+// v40 — The btn-switch-essay and btn-edit-essay registrations that lived here
+// were removed along with the sc screen they belonged to. Their functionality
+// is now reached through the essay-detail screen's own Edit button and the
+// Essays sidebar tab, both of which were already wired up independently.
 function defaultSaveHandler(){
   const title=document.getElementById('em-name').value.trim()||'Untitled Essay';
   const text=document.getElementById('em-text').value.trim();
@@ -1980,12 +1939,12 @@ function doWordBankFill(ch){
     setTimeout(()=>completeAct(80),400);
     return;
   }
-  // v39 — Difficulty determines how dense the puzzle is. Easy makes 5% of
-  // long-word candidates into blanks, Medium 15%, Hard 25% (the v38 value).
-  // The Math.max(2,...) clamp still applies because below two blanks the
-  // exercise becomes trivial — a single-chip drag isn't a memory test.
+  // v40 — Difficulty fractions: easy stays at 5%; medium and hard both
+  // got steeper because at the v39 values the puzzle felt closer to a
+  // warm-up than a real recall test. Medium is now 20% of long-word
+  // candidates, hard is 35%.
   const _p=G.prog[G.cur];const _d=getActDiff(_p,'wbf');
-  const _frac=_d==='easy'?0.05:_d==='medium'?0.15:0.25;
+  const _frac=_d==='easy'?0.05:_d==='medium'?0.20:0.35;
   const targetCount=Math.max(2,Math.min(candidates.length,Math.round(candidates.length*_frac)));
   // Shuffle candidates and take the target count
   const shuffled=[...candidates].sort(()=>Math.random()-0.5);
@@ -2227,8 +2186,12 @@ function doTypeFL(ch){
       if(ci>=words.length){
         const _denom=Math.max(1,_active.size);
         const fa=Math.max(0,Math.round(100-((mistakes/_denom)*100)));
-        if(fa>=80){setTimeout(()=>completeAct(fa),300);}
-        else{toast('💪',`${fa}% accuracy — need 80% to pass. Try again!`);setP(fa,'Needs retry');}
+        // v40 — Fire completeAct regardless of accuracy. The user's score is
+        // recorded so they can see their progress, and completeAct itself
+        // enforces the "only Hard + 80%+ counts as completion" rule by gating
+        // the tier-progression set on difficulty. Removing the local 80%
+        // gate here means a lower score is logged rather than swallowed.
+        setTimeout(()=>completeAct(fa),300);
       }
       else{wsp[ci].className='tw cu';wsp[ci].textContent='_'.repeat(words[ci].length);hw.textContent=`Word ${ci+1} of ${words.length}`;disp.scrollTop=disp.scrollHeight;}
     }else{mistakes++;playWrong();upAcc();inp.style.borderColor='var(--red)';setTimeout(()=>inp.style.borderColor='var(--border2)',300);}
@@ -2456,7 +2419,13 @@ function completeAct(score){
   if(score>=80)ghostSaveTime(k);
   else ghostReset();
   // XP scales with chunk word count (and sentence count for Sentence Scramble)
-  const xp=calcActXp(t,k,G.chunks[i],alreadyDone);
+  let xp=calcActXp(t,k,G.chunks[i],alreadyDone);
+  // v40 — For TFL and WBF the raw XP gets scaled by accuracy, so a 50%
+  // attempt yields half the XP and a 100% attempt yields the full amount.
+  // This means low-accuracy finishes (now allowed since v40) still grant
+  // a meaningful reward without overpaying for sloppy work. Math.max(1,...)
+  // keeps the floor at 1 XP — finishing always earns something.
+  if(k==='tfl'||k==='wbf')xp=Math.max(1,Math.round(xp*(score/100)));
   addXP(xp);
   pushXpDay(xp);
   // Log recent activity
@@ -2545,13 +2514,23 @@ function showReward(full,xp,score,i,kind){
     const pill=document.createElement('span');pill.className='tpill '+x.c;pill.style.opacity=x.d?'1':'.35';pill.textContent=(x.d?'✓ ':'')+x.lb;ts.appendChild(pill);
   });
   ro.classList.add('on');
-  // When the user taps to dismiss the activity reward overlay, navigate back to the
-  // activity screen FIRST, then drain any pending level-ups over the top. The level-up
-  // overlay has pointer-events:none so it sits on top of the activity screen visually
-  // without blocking it. This sequencing is what fixes the v1-v18 overlap bug.
+  // v40 — When the user dismisses the reward overlay, return them to the
+  // surface they launched the activity from. If edReturnEi was set by
+  // edLaunchActivity, the activity came from the essay-detail page and we
+  // route back there with the just-practiced chunk pre-expanded. Otherwise
+  // we fall back to the original sact path. upTierLocks runs before the
+  // branch so the tier-unlock celebration (chord + toast) fires in either
+  // navigation case.
   ro.onclick=()=>{
     ro.classList.remove('on');
-    renderCPStrip(i);upTierLocks(i,true);switchTier(G.tier);SS('sact');
+    upTierLocks(i,true);
+    if(G.edReturnEi!=null&&G.essays[G.edReturnEi]){
+      const ei=G.edReturnEi;G.edReturnEi=null;
+      G.edReturnCi=i;
+      openEssayDetail(ei);
+    } else {
+      renderCPStrip(i);switchTier(G.tier);SS('sact');
+    }
     checkPendingLevelUps();
   };
 }
@@ -4305,7 +4284,7 @@ function edBuildChunkRow(e,ei,ci,ch){
 
 // edBuildChunkExpanded — fills the expanded body with full chunk text, the
 // per-chunk stats grid, and the tier-tabbed activity launcher.
-function edBuildChunkExpanded(e,ei,ci,ch,c){
+function edBuildChunkExpanded(e,ei,ci,ch,c,preferredTier){
   const p=e.prog?.[ci]||{f:new Set(),s:new Set(),m:new Set(),best:{},bestTime:{}};
 
   // Full text in scrollable cue-box-style container
@@ -4411,8 +4390,12 @@ function edBuildChunkExpanded(e,ei,ci,ch,c){
               // Rebuild the expanded body in place. We keep references to
               // the right essay (e), index (ei,ci), and chunk text (ch)
               // because they're all in the enclosing closure.
+              // v40 — Pass `t` (the current tier from showTier's closure) so
+              // the rebuild restores the user to the same tier they were on.
+              // Without this, switching difficulty on a fully-unlocked chunk
+              // always snapped them back to Remember.
               const inner=card.closest('.ed-chunk-body-inner');
-              if(inner){inner.innerHTML='';edBuildChunkExpanded(e,ei,ci,ch,inner);}
+              if(inner){inner.innerHTML='';edBuildChunkExpanded(e,ei,ci,ch,inner,t);}
             });
             menu.appendChild(opt);
           });
@@ -4436,7 +4419,12 @@ function edBuildChunkExpanded(e,ei,ci,ch,c){
     b.onclick=()=>{if(!b.classList.contains('locked'))showTier(b.dataset.tier);};
   });
   // Default to the highest unlocked tier so returning users land on what they're currently working through
-  showTier(!locked.m?'m':!locked.s?'s':'f');
+  // v40 — When a preferredTier is passed (used by the difficulty-change
+  // rebuild path), keep the user on that tier rather than snapping to the
+  // highest unlocked. The fallback chain remains: prefer Remember if
+  // unlocked, then Retain, then Recite — same as v39 behaviour.
+  const defaultT=!locked.m?'m':!locked.s?'s':'f';
+  showTier(preferredTier&&!locked[preferredTier]?preferredTier:defaultT);
 }
 
 // edLaunchActivity — bridge from hub into practice. Loads the essay, opens the
