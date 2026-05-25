@@ -146,6 +146,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .tw.pe { color:var(--text3); }
 .tw.cu { color:var(--gold); font-weight:700; background:rgba(245,200,66,.1); border-radius:4px; padding:0 4px; }
 .tw.ok { color:var(--green); }
+/* v42.1 — Auto-revealed words (the ones Easy/Medium difficulty hands you
+   for free) need their own colour. The pe grey from v42 was hard to read
+   against the dark surface because a full word in dim grey blends in,
+   whereas the same grey on underscores read fine. var(--text) keeps them
+   clearly legible while the green/orange/red colours still mark the words
+   the user actually earned. */
+.tw.auto { color:var(--text); }
 /* v41 — Per-word mistake colour-coding. warn = one wrong attempt before
    getting it right (orange), bad = two or more wrong attempts before
    getting it right (red). The classes apply when the word is revealed,
@@ -1320,8 +1327,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 // they differ. To ship a new version: increment CURRENT_VERSION, add an entry
 // to CHANGELOG at the top of the list. Brand-new users (no app data at all)
 // skip the popup — they get a fresh start, not an update notification.
-const CURRENT_VERSION='42';
+const CURRENT_VERSION='42.1';
 const CHANGELOG={
+  '42.1':{date:'May 2026',items:[
+    'In Easy and Medium Type First Letter, the auto-revealed words now use the main text colour instead of grey. Grey on a full word was hard to read against the dark surface, whereas the same grey on underscore placeholders worked fine. Green/orange/red still mark the words you actually earned.'
+  ]},
   '42':{date:'May 2026',items:[
     'In Type First Letter on Easy and Medium difficulty, the words that appear pre-revealed (because difficulty handed them to you) now show in grey rather than green. Green is reserved for words you actually earned on the first try.',
     'Skipped words now show in red instead of grey, sharing the same colour as words that took three or more attempts. Both are forms of struggle, and the visual signals that consistently now.',
@@ -2202,7 +2212,11 @@ function doTypeFL(ch){
       // (tw ok). Green now means "you earned this on first try"; auto-
       // revealed words were free under easy/medium difficulty and shouldn't
       // share that visual reward.
-      s.className='tw pe';
+      // v42.1 — Switched from tw pe (grey) to tw auto (full text colour)
+      // because grey on a full word blends into the dark surface and is
+      // hard to read. The pe class works fine for sparse underscores but
+      // not for runs of full-text words.
+      s.className='tw auto';
       s.textContent=w+' ';
     } else {
       s.className='tw'+(i===_firstActive?' cu':' pe');
