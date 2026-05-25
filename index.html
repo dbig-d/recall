@@ -212,6 +212,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .rxp { font-family:var(--fd); font-size:1.5rem; letter-spacing:.1em; }
 .rh { font-size:.7rem; color:var(--text3); font-family:var(--fm); margin-top:.3rem; }
 .rts { display:flex; gap:.5rem; align-items:center; }
+/* v42 — Per-word mistake breakdown for TFL. Reads as a quiet caption below
+   the tier pills, with each category's colour matching the in-activity word
+   colour so the user can connect the breakdown numbers to what they saw. */
+.rbd { font-family:var(--fm); font-size:.78rem; color:var(--text3); display:flex; gap:1rem; align-items:center; flex-wrap:wrap; justify-content:center; max-width:480px; }
+.rbd span { letter-spacing:.04em; }
 
 /* LEVEL UP OVERLAY */
 #luo { position:fixed; inset:0; z-index:600; display:none; flex-direction:column; align-items:center; justify-content:center; gap:1.5rem; text-align:center; pointer-events:none; }
@@ -1062,6 +1067,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div class="rt" id="ro-t">NICE!</div>
   <div class="rm2" id="ro-m"></div>
   <div class="rts" id="ro-ts"></div>
+  <div class="rbd" id="ro-bd" style="display:none;"></div>
   <div class="rxp" id="ro-xp">+100 XP</div>
   <div class="rh">tap anywhere to continue</div>
 </div>
@@ -1314,8 +1320,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 // they differ. To ship a new version: increment CURRENT_VERSION, add an entry
 // to CHANGELOG at the top of the list. Brand-new users (no app data at all)
 // skip the popup — they get a fresh start, not an update notification.
-const CURRENT_VERSION='41';
+const CURRENT_VERSION='42';
 const CHANGELOG={
+  '42':{date:'May 2026',items:[
+    'In Type First Letter on Easy and Medium difficulty, the words that appear pre-revealed (because difficulty handed them to you) now show in grey rather than green. Green is reserved for words you actually earned on the first try.',
+    'Skipped words now show in red instead of grey, sharing the same colour as words that took three or more attempts. Both are forms of struggle, and the visual signals that consistently now.',
+    'After completing Type First Letter, the reward screen now shows a small breakdown of how each word went — e.g. "12 first try · 3 second try · 1 three or more · 2 skipped". Categories with zero count are omitted so the line stays clean.'
+  ]},
   '41':{date:'May 2026',items:[
     'Type First Letter now shows punctuation in pending words from the start. A word like "GMO\u2019s" displays as ___\u2019_ (three underscores, apostrophe, one underscore) instead of five underscores, so word lengths read accurately.',
     'When you get a word right on the first try it stays green. Take a second attempt and the revealed word shows in orange. Take three or more attempts and it shows in red. Skipped words remain grey as before.',
@@ -2175,12 +2186,23 @@ function doTypeFL(ch){
   // First active index is the initial 'cu' (current) word; words before it
   // that are non-active just show their text as already revealed.
   let _firstActive=words.findIndex((_,i)=>_active.has(i));
+  // v42 — Per-word outcome tracking. Each entry holds 'auto' (revealed for
+  // free under easy/medium difficulty), 'first' (typed correctly first try),
+  // 'second' (one mistake), 'plus' (two or more mistakes), 'skip' (user
+  // pressed SKIP WORD), or null (not yet reached). The array is folded into
+  // a breakdown shown on the reward overlay at completion.
+  const _wordOutcome=new Array(words.length).fill(null);
+  words.forEach((_,i)=>{if(!_active.has(i))_wordOutcome[i]='auto';});
   PC().appendChild(mkP('Type only the first letter of each word — the full word appears when correct:'));
   const disp=document.createElement('div');disp.className='twd';
   const wsp=words.map((w,i)=>{
     const s=document.createElement('span');
     if(!_active.has(i)){
-      s.className='tw ok';
+      // v42 — Auto-revealed words render in grey (tw pe) rather than green
+      // (tw ok). Green now means "you earned this on first try"; auto-
+      // revealed words were free under easy/medium difficulty and shouldn't
+      // share that visual reward.
+      s.className='tw pe';
       s.textContent=w+' ';
     } else {
       s.className='tw'+(i===_firstActive?' cu':' pe');
@@ -2217,7 +2239,10 @@ function doTypeFL(ch){
       // tries), 2+ → red (took three or more). The class replaces the
       // would-be .ok green directly so no extra DOM work is needed.
       const _cls=wm===0?'ok':wm===1?'warn':'bad';
-      wsp[ci].className='tw '+_cls;wsp[ci].textContent=words[ci]+' ';ci++;
+      wsp[ci].className='tw '+_cls;wsp[ci].textContent=words[ci]+' ';
+      // v42 — Record this word's outcome for the end-of-activity breakdown.
+      _wordOutcome[ci]=wm===0?'first':wm===1?'second':'plus';
+      ci++;
       // v39 — Skip over any non-active words so the user's next target is the
       // next word that actually requires typing under the current difficulty.
       while(ci<words.length&&!_active.has(ci))ci++;
@@ -2231,10 +2256,21 @@ function doTypeFL(ch){
         // enforces the "only Hard + 80%+ counts as completion" rule by gating
         // the tier-progression set on difficulty. Removing the local 80%
         // gate here means a lower score is logged rather than swallowed.
+        // v42 — Stash the per-word outcome breakdown so showReward can
+        // surface it. The flag is read-once-and-cleared in showReward.
+        G._tflBreakdown=_computeBreakdown();
         setTimeout(()=>completeAct(fa),300);
       }
       else{wsp[ci].className='tw cu';wsp[ci].textContent=maskWord(words[ci]);hw.textContent=`Word ${ci+1} of ${words.length}`;disp.scrollTop=disp.scrollHeight;}
     }else{mistakes++;wm++;playWrong();upAcc();inp.style.borderColor='var(--red)';setTimeout(()=>inp.style.borderColor='var(--border2)',300);}
+  }
+  // v42 — Fold the outcome array into a small object of category counts.
+  // Categories with zero entries are simply not displayed by showReward,
+  // so we don't need to filter here.
+  function _computeBreakdown(){
+    const b={first:0,second:0,plus:0,skip:0};
+    _wordOutcome.forEach(v=>{if(v&&b[v]!=null)b[v]++;});
+    return b;
   }
   inp.addEventListener('keydown',e=>{
     ghostRecordStart();
@@ -2245,7 +2281,7 @@ function doTypeFL(ch){
     if(inp.value.length===1)adv();
   });
   setTimeout(()=>inp.focus(),100);
-  PA().appendChild(mkBS('SKIP WORD',()=>{if(ci<words.length){mistakes++;upAcc();wsp[ci].className='tw pe';wsp[ci].textContent=words[ci];ci++;while(ci<words.length&&!_active.has(ci))ci++;wm=0;if(ci<words.length){wsp[ci].className='tw cu';wsp[ci].textContent=maskWord(words[ci]);hw.textContent=`Word ${ci+1} of ${words.length}`;}setP((ci/words.length)*100,`${ci}/${words.length} words`);if(ci>=words.length){const _denom=Math.max(1,_active.size);const fa=Math.max(0,Math.round(100-((mistakes/_denom)*100)));setTimeout(()=>completeAct(fa),300);}inp.focus();}}));
+  PA().appendChild(mkBS('SKIP WORD',()=>{if(ci<words.length){mistakes++;upAcc();wsp[ci].className='tw bad';wsp[ci].textContent=words[ci];_wordOutcome[ci]='skip';ci++;while(ci<words.length&&!_active.has(ci))ci++;wm=0;if(ci<words.length){wsp[ci].className='tw cu';wsp[ci].textContent=maskWord(words[ci]);hw.textContent=`Word ${ci+1} of ${words.length}`;}setP((ci/words.length)*100,`${ci}/${words.length} words`);if(ci>=words.length){const _denom=Math.max(1,_active.size);const fa=Math.max(0,Math.round(100-((mistakes/_denom)*100)));G._tflBreakdown=_computeBreakdown();setTimeout(()=>completeAct(fa),300);}inp.focus();}}));
 }
 
 // ===== SCRAMBLE =====
@@ -2553,6 +2589,30 @@ function showReward(full,xp,score,i,kind){
   [{lb:'FAM',c:'pf',d:p.f.size>=3},{lb:'SOL',c:'ps',d:p.s.size>=2},{lb:'MAS',c:'pm',d:p.m.size>=1}].forEach(x=>{
     const pill=document.createElement('span');pill.className='tpill '+x.c;pill.style.opacity=x.d?'1':'.35';pill.textContent=(x.d?'✓ ':'')+x.lb;ts.appendChild(pill);
   });
+  // v42 — Optional per-word mistake breakdown for TFL. The data was stashed
+  // on G._tflBreakdown by doTypeFL right before it called completeAct.
+  // We consume it once (clearing the flag immediately so a subsequent
+  // non-TFL completion doesn't reuse stale data), and only render if the
+  // just-completed activity was actually TFL. Empty categories are omitted
+  // so the line stays clean — a chunk with no second-try words doesn't
+  // show "0 second try".
+  const bdEl=document.getElementById('ro-bd');
+  const bd=G._tflBreakdown;G._tflBreakdown=null;
+  if(bd&&G.act==='tfl'&&bdEl){
+    const parts=[];
+    if(bd.first)parts.push(`<span style="color:var(--green)">${bd.first} first try</span>`);
+    if(bd.second)parts.push(`<span style="color:var(--orange)">${bd.second} second try</span>`);
+    if(bd.plus)parts.push(`<span style="color:var(--red)">${bd.plus} three or more</span>`);
+    if(bd.skip)parts.push(`<span style="color:var(--red);opacity:.75">${bd.skip} skipped</span>`);
+    if(parts.length){
+      bdEl.innerHTML=parts.join(' <span style="opacity:.4">·</span> ');
+      bdEl.style.display='';
+    } else {
+      bdEl.style.display='none';
+    }
+  } else if(bdEl) {
+    bdEl.style.display='none';
+  }
   ro.classList.add('on');
   // v40 — When the user dismisses the reward overlay, return them to the
   // surface they launched the activity from. If edReturnEi was set by
