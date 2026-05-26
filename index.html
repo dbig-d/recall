@@ -202,6 +202,50 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .bk { background:transparent; border:1px solid var(--border); color:var(--text2); padding:.42rem .9rem; border-radius:50px; cursor:pointer; font-size:.76rem; transition:all .15s; font-family:var(--fb); display:inline-flex; align-items:center; gap:.3rem; }
 .bk:hover { border-color:var(--border2); color:var(--text); }
 
+/* v43 — Writing activities (gco, rfh, wfm). All three rely on the user
+   writing on paper rather than typing into the app. Their visual language
+   is intentionally calmer than the typing/scramble activities — fewer
+   moving parts, more breathing room, deliberate use of card containers
+   to draw focus to the one thing the user should be reading. */
+
+/* Guided Copy — large centred sentence card, brighter border than the
+   standard cue-box because the user should be looking at this and only
+   this for thirty seconds at a time. */
+.gco-card { background:var(--surface); border:1.5px solid var(--accent); border-radius:var(--rl); padding:2.2rem 1.8rem; text-align:center; margin:.75rem 0; box-shadow:0 0 24px rgba(124,92,252,.12); }
+.gco-num { font-family:var(--fm); font-size:.7rem; color:var(--gold); letter-spacing:.14em; margin-bottom:1rem; }
+.gco-sent { font-size:1.15rem; line-height:1.55; color:var(--text); }
+
+/* Self-assessment row — three chunky cards each spanning roughly a third
+   of the screen. Used by Write From Memory and Reconstruct from Headings
+   to capture honest user judgement when there's no automatic scoring. */
+.sa-row { display:flex; gap:1rem; margin:1.25rem 0; flex-wrap:wrap; }
+.sa-btn { flex:1 1 200px; min-height:130px; padding:1.5rem 1rem; border-radius:var(--rl); border:2px solid; cursor:pointer; background:var(--surface); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.55rem; transition:filter .15s, transform .1s; font-family:inherit; }
+.sa-btn:hover { filter:brightness(1.15); transform:translateY(-1px); }
+.sa-emj { font-size:1.85rem; line-height:1; }
+.sa-ttl { font-family:var(--fd); font-size:1rem; letter-spacing:.05em; font-weight:600; }
+.sa-sub { font-size:.72rem; color:var(--text2); line-height:1.4; text-align:center; max-width:160px; }
+.sa-red { border-color:var(--red); }
+.sa-red .sa-ttl { color:var(--red); }
+.sa-yel { border-color:var(--gold); }
+.sa-yel .sa-ttl { color:var(--gold); }
+.sa-grn { border-color:var(--green); }
+.sa-grn .sa-ttl { color:var(--green); }
+
+/* Show-the-chunk reveal toggle — used by wfm and rfh below the assessment
+   so the user can compare their handwritten work to the original. */
+.sct-wrap { margin:1rem 0; width:100%; }
+.sct-btn { width:100%; padding:.75rem 1rem; background:var(--surface); border:1px solid var(--border2); border-radius:50px; color:var(--text2); cursor:pointer; font-family:var(--fm); font-size:.82rem; letter-spacing:.06em; transition:all .15s; }
+.sct-btn:hover { color:var(--text); border-color:var(--accent); }
+.sct-box { margin-top:.75rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--rl); padding:1.25rem 1.5rem; line-height:1.7; color:var(--text); font-size:.92rem; }
+
+/* Heading anchor list for Reconstruct from Headings — a numbered list of
+   first-few-words prompts that gives the user the essay's structure
+   without giving away the content. */
+.rfh-list { background:var(--surface); border:1px solid var(--border); border-radius:var(--rl); padding:1.25rem 1.5rem; margin:.75rem 0; }
+.rfh-item { font-family:var(--fm); font-size:.85rem; color:var(--text); padding:.4rem 0; line-height:1.55; display:flex; gap:.6rem; }
+.rfh-num { color:var(--gold); flex-shrink:0; min-width:1.5rem; }
+.rfh-anc { color:var(--text); }
+
 /* CONFETTI */
 #cc { position:fixed; inset:0; pointer-events:none; z-index:9999; }
 /* TOAST */
@@ -1327,8 +1371,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 // they differ. To ship a new version: increment CURRENT_VERSION, add an entry
 // to CHANGELOG at the top of the list. Brand-new users (no app data at all)
 // skip the popup — they get a fresh start, not an update notification.
-const CURRENT_VERSION='42.1';
+const CURRENT_VERSION='43';
 const CHANGELOG={
+  '43':{date:'May 2026',items:[
+    'New Recite activity — Guided Copy. The chunk is presented one sentence at a time on a large centred card. You read each sentence, write it on paper, and tap Next sentence to advance. Forces you to engage with the structure of the chunk rather than skimming it as a single block.',
+    'New Retain activity — Reconstruct from Headings. The first three or four words of each sentence appear as numbered anchors. You write the full chunk on paper using only those anchors as a structural guide. The most exam-like activity in the app — you see a prompt and reconstruct the surrounding argument.',
+    'New Remember activity — Write From Memory. The handwriting equivalent of Full Recall. No cues, no anchors, just an instruction to write the chunk on paper. After writing, you self-assess against the original using three honest options: Struggled, Close, or Nailed it.',
+    'Both Reconstruct from Headings and Write From Memory include a Show the chunk reveal toggle so you can compare your handwritten work to the original before assessing. The first time you tap it per session, a hint reminds you to compare honestly.'
+  ]},
   '42.1':{date:'May 2026',items:[
     'In Easy and Medium Type First Letter, the auto-revealed words now use the main text colour instead of grey. Grey on a full word was hard to read against the dark surface, whereas the same grey on underscore placeholders worked fine. Green/orange/red still mark the words you actually earned.'
   ]},
@@ -1446,15 +1496,18 @@ const ACTS = {
     {k:'fl',  nm:'First Letters',      ic:'🔤', de:'Only the first letter of each word. Use them to recite the full text.'},
     {k:'sp',  nm:'Speak It Aloud',     ic:'🎤', de:'Read the chunk and speak it clearly — the mic checks your coverage.'},
     {k:'kcf', nm:'Key Clauses Flip',   ic:'🃏', de:'The chunk is split into clauses on flippable cards — flip through to internalise the structure.'},
+    {k:'gco', nm:'Guided Copy',        ic:'✍️', de:'One sentence at a time. Read it, write it by hand on paper, then advance to the next.'},
   ],
   s:[
     {k:'tfl', nm:'Type First Letter',  ic:'⌨️', de:'Type just the first letter of each word. The full word appears when correct.'},
     {k:'sc',  nm:'Sentence Scramble',  ic:'🔀', de:'Sentences are shuffled — drag them back into the right order.'},
     {k:'wbf', nm:'Word Bank Fill',     ic:'🧩', de:'Key words are pulled out — pick chips from the bank and slot them back into the right blanks.'},
+    {k:'rfh', nm:'Reconstruct from Headings', ic:'🗺️', de:'You see the first few words of each sentence as anchors. Write the full chunk by hand using the structure as a guide.'},
   ],
   m:[
     {k:'fr',  nm:'Full Recall',        ic:'✍️', de:'Type the entire chunk from memory. No cues — scored on accuracy.'},
     {k:'sb',  nm:'Speak Blind',        ic:'🎙️', de:'Mic on, no text shown. Say the full chunk from memory.'},
+    {k:'wfm', nm:'Write From Memory',  ic:'📝', de:'Write the full chunk on paper from memory with zero cues, then self-assess against the original.'},
   ],
 };
 const TIER_XP = {f:[30,50],s:[80,100],m:[150,200]};
@@ -1822,6 +1875,20 @@ function calcTimer(k,ch){
     const sents=(ch.trim().match(/[^.!?]+[.!?]+/g)||[ch.trim()]).length;
     return roundTo30(Math.max(sents,1)*15);
   }
+  // v43 — Writing activities scale by sentence count (gco, rfh) or word
+  // count (wfm). Handwriting is roughly twice as slow as typing, hence the
+  // wfm multiplier of 6 vs fr/sb's 5. Guided Copy is the lightest because
+  // the user is just copying one sentence at a time. RFH adds slack over
+  // Guided Copy because writing from memory takes longer than copying.
+  if(k==='gco'){
+    const sents=(ch.trim().match(/[^.!?]+[.!?]+/g)||[ch.trim()]).length;
+    return roundTo30(Math.max(sents,1)*25);
+  }
+  if(k==='rfh'){
+    const sents=(ch.trim().match(/[^.!?]+[.!?]+/g)||[ch.trim()]).length;
+    return roundTo30(Math.max(sents,1)*30);
+  }
+  if(k==='wfm') return roundTo30(words*6);
   if(k==='fr'||k==='sb') return roundTo30(words*5);
   return roundTo30(words*3); // tfl, fl, tr, sp
 }
@@ -1848,6 +1915,9 @@ function startAct(t,k){
   else if(k==='wbf') doWordBankFill(ch);
   else if(k==='fr')  doFreeRecall(ch);
   else if(k==='sb')  doSpeak(ch,true);
+  else if(k==='gco') doGuidedCopy(ch);
+  else if(k==='wfm') doWriteFromMemory(ch);
+  else if(k==='rfh') doReconstructFromHeadings(ch);
   startTmr(G.actTimerSec);
   SS('spr');
 }
@@ -2478,6 +2548,148 @@ function calcActXp(t,k,chunkText,alreadyDone){
 function calcBossXp(chunkText,isRepeat){
   const rate=isRepeat?1.5:2;
   return Math.max(1,Math.round(countWords(chunkText)*rate));
+}
+
+// ========== v43 WRITING ACTIVITIES ==========
+// Three activities that take memorisation off the keyboard and onto paper:
+// Guided Copy (Recite), Reconstruct from Headings (Retain), and Write From
+// Memory (Remember). Each leverages the slowness of handwriting to deepen
+// encoding, and uses self-assessment for the two harder ones since OCR on
+// handwriting isn't feasible inside a single-file web app.
+
+// Split a chunk into "anchor" strings — first few words of each sentence,
+// trailed by an ellipsis. Used by Reconstruct from Headings. Has three
+// branches: ≥2 sentences uses first-4-words per sentence; 1 sentence falls
+// back to clause splits if available; otherwise the whole chunk becomes a
+// single anchor of first 6 words. The regex strips stray punctuation
+// before slicing so a sentence like "Yet, surprisingly, we found..." gives
+// "Yet surprisingly we found..." rather than ", surprisingly, we...".
+function buildAnchors(ch){
+  const firstNWords=(s,n)=>{
+    const words=s.replace(/[^\w\s']/g,' ').trim().split(/\s+/).filter(Boolean);
+    const slice=words.slice(0,n).join(' ');
+    return slice+(words.length>n?'…':'');
+  };
+  let sents=ch.trim().match(/[^.!?]+[.!?]+/g);
+  if(sents){sents=sents.map(s=>s.trim()).filter(Boolean);}
+  if(sents&&sents.length>=2){return sents.map(s=>firstNWords(s,4));}
+  // Single sentence (or non-sentence-ended text) — try clause split as fallback
+  const clauses=splitIntoClauses(ch.trim());
+  if(clauses&&clauses.length>=2){return clauses.map(c=>firstNWords(c,4));}
+  // One unsplittable run — single anchor of first 6 words
+  return [firstNWords(ch.trim(),6)];
+}
+
+// Build the three-button self-assessment row plus the show-the-chunk
+// reveal toggle. Used by Write From Memory and Reconstruct from Headings.
+// Centralising this means the assessment scores (40/75/100) and the reveal
+// hint copy only need to live in one place. The hint toast fires once per
+// session via G._writingHintShown so a user toggling repeatedly isn't
+// nagged. Each button calls completeAct with its associated score and
+// performs no other side effects, so the rest of the completion flow
+// (XP, tier-progression gating, reward overlay) handles itself.
+function addWritingAssessment(ch){
+  const grp=document.createElement('div');grp.className='sa-row';
+  const opts=[
+    {emj:'🔴',ttl:'Struggled', sub:'Major gaps, wrote less than half',     score:40, cls:'sa-red'},
+    {emj:'🟡',ttl:'Close',     sub:'A few words wrong, mostly right',       score:75, cls:'sa-yel'},
+    {emj:'🟢',ttl:'Nailed it', sub:'Word-perfect or near enough',           score:100,cls:'sa-grn'},
+  ];
+  opts.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='sa-btn '+o.cls;
+    b.innerHTML=`<div class="sa-emj">${o.emj}</div><div class="sa-ttl">${o.ttl}</div><div class="sa-sub">${esc(o.sub)}</div>`;
+    b.onclick=()=>completeAct(o.score);
+    grp.appendChild(b);
+  });
+  PC().appendChild(grp);
+
+  // Reveal toggle — sits below the assessment so the user can compare
+  // honestly before deciding which button to tap. The hint toast fires
+  // only on the first reveal of the session to teach the intended
+  // interaction without becoming spam on subsequent toggles.
+  const togWrap=document.createElement('div');togWrap.className='sct-wrap';
+  const togBtn=document.createElement('button');togBtn.className='sct-btn';togBtn.textContent='Show the chunk';
+  const box=document.createElement('div');box.className='sct-box';box.style.display='none';box.textContent=ch.trim();
+  let shown=false;
+  togBtn.onclick=()=>{
+    shown=!shown;
+    box.style.display=shown?'':'none';
+    togBtn.textContent=shown?'Hide the chunk':'Show the chunk';
+    if(shown&&!G._writingHintShown){
+      G._writingHintShown=true;
+      toast('💡','Compare honestly — your brain learns from the gap.');
+    }
+  };
+  togWrap.appendChild(togBtn);togWrap.appendChild(box);
+  PC().appendChild(togWrap);
+}
+
+// Guided Copy — read one sentence, write it by hand, advance to the next.
+// The activity is paced by the user's own writing speed; the timer is just
+// a soft ceiling so the screen doesn't sit forever. Scoring is binary:
+// finishing the activity scores 100 because there's no accuracy metric to
+// derive — the user is copying, not recalling. The chord regex matches
+// the rest of the app; a comma-split fallback handles chunks that have no
+// terminal punctuation, and a final fallback wraps the whole chunk as a
+// single sentence so very short chunks still function.
+function doGuidedCopy(ch){
+  let sents=ch.trim().match(/[^.!?]+[.!?]+/g);
+  if(sents){sents=sents.map(s=>s.trim()).filter(Boolean);}
+  if(!sents||sents.length<2){
+    const commaSplit=ch.trim().split(/,/).map(s=>s.trim()).filter(Boolean);
+    sents=commaSplit.length>=2?commaSplit:[ch.trim()];
+  }
+  let idx=0;
+  PC().appendChild(mkP('Read each sentence, write it out by hand on paper, then advance to the next.'));
+  const card=document.createElement('div');card.className='gco-card';
+  const numEl=document.createElement('div');numEl.className='gco-num';
+  const sentEl=document.createElement('div');sentEl.className='gco-sent';
+  card.appendChild(numEl);card.appendChild(sentEl);
+  PC().appendChild(card);
+
+  const btn=mkBS('Next sentence →',()=>{
+    if(idx<sents.length-1){idx++;show();}
+    else {completeAct(100);}
+  });
+  PA().appendChild(btn);
+
+  function show(){
+    numEl.textContent=`SENTENCE ${idx+1} OF ${sents.length}`;
+    sentEl.textContent=sents[idx];
+    btn.textContent=idx===sents.length-1?'✓ DONE':'Next sentence →';
+    setP(((idx+1)/sents.length)*100,`${idx+1}/${sents.length}`);
+  }
+  show();
+}
+
+// Write From Memory — the bare-screen handwriting equivalent of Full
+// Recall. No cues, no text, just an instruction and the assessment block.
+// User writes on paper, optionally reveals the chunk for comparison, then
+// honestly picks one of three buttons. Score maps directly to completeAct
+// (40/75/100), so PB and XP scale exactly as they do for other activities.
+function doWriteFromMemory(ch){
+  PC().appendChild(mkP("Write the full chunk from memory on paper. When you're done, come back and check your accuracy."));
+  addWritingAssessment(ch);
+}
+
+// Reconstruct from Headings — same self-assessment as Write From Memory,
+// but with the structural scaffold of first-few-words anchors. The
+// anchors are retrieval cues in the psychological sense: enough to point
+// at the right memory trace without giving away the words themselves.
+// This is the activity that most closely mirrors how an exam works — you
+// see a prompt and must reconstruct the surrounding argument.
+function doReconstructFromHeadings(ch){
+  const anchors=buildAnchors(ch);
+  PC().appendChild(mkP("Use these anchors to write the full chunk from memory on paper. The headings give you the structure — the words are yours."));
+  const list=document.createElement('div');list.className='rfh-list';
+  anchors.forEach((a,i)=>{
+    const item=document.createElement('div');item.className='rfh-item';
+    item.innerHTML=`<span class="rfh-num">${i+1}.</span><span class="rfh-anc">${esc(a)}</span>`;
+    list.appendChild(item);
+  });
+  PC().appendChild(list);
+  addWritingAssessment(ch);
 }
 
 // ========== COMPLETE ACTIVITY ==========
